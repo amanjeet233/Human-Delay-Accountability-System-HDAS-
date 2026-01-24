@@ -1,7 +1,7 @@
 package com.hdas.controller;
 
 import com.hdas.domain.assignment.Assignment;
-import com.hdas.repository.AssignmentRepository;
+import com.hdas.service.RequestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,11 +15,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AssignmentController {
     
-    private final AssignmentRepository assignmentRepository;
+    private final RequestService requestService;
     
     @GetMapping("/{requestId}/assignments")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Assignment>> getAssignmentsByRequest(@PathVariable UUID requestId) {
-        return ResponseEntity.ok(assignmentRepository.findByRequestId(requestId));
+        return ResponseEntity.ok(requestService.getAssignmentsByRequest(requestId));
     }
 }

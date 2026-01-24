@@ -2,8 +2,6 @@ package com.hdas.controller;
 
 import com.hdas.domain.request.Request;
 import com.hdas.domain.user.User;
-import com.hdas.repository.RequestRepository;
-import com.hdas.repository.UserRepository;
 import com.hdas.security.RoleBasedAccessControl;
 import com.hdas.service.AuditService;
 import com.hdas.service.FeatureFlagService;
@@ -28,8 +26,6 @@ import java.util.logging.Logger;
 public class RequestController {
     
     private final RequestService requestService;
-    private final RequestRepository requestRepository;
-    private final UserRepository userRepository;
     private final AuditService auditService;
     private final FeatureFlagService featureFlagService;
     private static final Logger log = Logger.getLogger(RequestController.class.getName());
@@ -100,10 +96,7 @@ public class RequestController {
         
         try {
             String username = RoleBasedAccessControl.getCurrentUsername();
-            User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-            
-            List<Request> requests = requestRepository.findByCreatedById(user.getId());
+            List<Request> requests = requestService.getRequestsByCreatorUsername(username);
             List<Map<String, Object>> response = requests.stream()
                 .map(request -> Map.of(
                     "id", (Object) request.getId().toString(),
@@ -131,7 +124,7 @@ public class RequestController {
         
         try {
             UUID requestId = UUID.fromString(id);
-            Request request = requestRepository.findById(requestId)
+            Request request = requestService.getRequestById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
             
             Map<String, Object> response = Map.of(
@@ -189,7 +182,7 @@ public class RequestController {
         
         try {
             UUID requestId = UUID.fromString(id);
-            Request request = requestRepository.findById(requestId)
+            Request request = requestService.getRequestById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
             
             Map<String, Object> status = Map.of(
@@ -213,7 +206,7 @@ public class RequestController {
         log.info("Admin viewing all requests");
         
         try {
-            List<Request> allRequests = requestRepository.findAll();
+            List<Request> allRequests = requestService.getAllRequests();
             List<Map<String, Object>> response = allRequests.stream()
                 .map(request -> {
                     Map<String, Object> map = new java.util.HashMap<>();

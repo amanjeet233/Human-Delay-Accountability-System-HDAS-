@@ -184,4 +184,13 @@ public class UserService {
     public Role createRole(Role role) {
         return roleRepository.save(role);
     }
+
+    // Read operations for controllers
+    public java.util.List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    public java.util.Optional<User> getUserById(UUID id) {
+        return userRepository.findById(id);
+    }
 }

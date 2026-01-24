@@ -65,4 +65,13 @@ public class RoleService {
         
         return role;
     }
+
+    // Read operations for controllers
+    public java.util.List<Role> getAllRoles() {
+        return roleRepository.findAll();
+    }
+
+    public java.util.Optional<Role> getRoleById(UUID id) {
+        return roleRepository.findById(id);
+    }
 }

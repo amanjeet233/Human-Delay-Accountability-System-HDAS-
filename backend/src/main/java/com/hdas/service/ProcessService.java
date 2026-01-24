@@ -106,4 +106,13 @@ public class ProcessService {
         
         return step;
     }
+
+    // Read operations for controllers
+    public java.util.List<Process> getActiveProcesses() {
+        return processRepository.findByActiveTrue();
+    }
+
+    public java.util.Optional<Process> getProcessById(UUID id) {
+        return processRepository.findById(id);
+    }
 }

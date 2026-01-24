@@ -3,7 +3,6 @@ package com.hdas.controller;
 import com.hdas.domain.user.User;
 import com.hdas.dto.CreateUserRequest;
 import com.hdas.dto.UpdateUserRequest;
-import com.hdas.repository.UserRepository;
 import com.hdas.service.AuditService;
 import com.hdas.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,19 +21,18 @@ import java.util.UUID;
 public class UserController {
     
     private final UserService userService;
-    private final UserRepository userRepository;
     private final AuditService auditService;
     
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userRepository.findAll());
+        return ResponseEntity.ok(userService.getAllUsers());
     }
     
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<User> getUser(@PathVariable UUID id) {
-        return userRepository.findById(id)
+        return userService.getUserById(id)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }

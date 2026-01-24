@@ -1,3 +1,31 @@
+## Security Profiles
+
+- Default (secure): Role/JWT security is active in all profiles except `simple`. Leave `SPRING_PROFILES_ACTIVE` unset or use `dev`/`prod`.
+- Simple (dev-only): Permissive chain for local UI/dev. Use `simple` profile.
+
+### Run commands
+
+- Secure default (dev):
+  - PowerShell script: start the backend on port 8081
+    - `./start-backend.ps1`
+  - Maven run (port 8080):
+    - `mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=dev`
+
+- Simple dev mode:
+  - Maven run (port 8080):
+    - `mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=simple`
+  - Jar run (after `mvn package`):
+    - `java -jar backend/target/human-delay-accountability-system-1.0.0.jar --spring.profiles.active=simple`
+
+### Health checks
+
+- Check service status:
+  - `http://localhost:8080/actuator/health` (Maven default)
+  - `http://localhost:8081/actuator/health` (start-backend.ps1)
+
+Notes
+- Interceptor-based checks are disabled in `simple` profile to avoid overlap.
+- JWT/role-based security remains the default in non-`simple` profiles.
 # HDAS Role README — Admin (System & Process Owner)
 
 ## 1. ROLE OVERVIEW

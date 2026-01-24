@@ -94,4 +94,9 @@ public class FileStorageService {
             return ResponseEntity.notFound().build();
         }
     }
+
+    // Read operations for controllers
+    public java.util.List<FileAttachment> getAttachmentsByRequestId(UUID requestId) {
+        return fileAttachmentRepository.findByRequestId(requestId);
+    }
 }

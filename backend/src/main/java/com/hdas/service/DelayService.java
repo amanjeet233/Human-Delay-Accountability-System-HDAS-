@@ -43,4 +43,13 @@ public class DelayService {
         
         return delay;
     }
+
+    // Read operations for controllers
+    public java.util.List<Delay> getAllDelays() {
+        return delayRepository.findAll();
+    }
+
+    public java.util.List<Delay> getDelaysByAssignment(UUID assignmentId) {
+        return delayRepository.findByAssignmentId(assignmentId);
+    }
 }

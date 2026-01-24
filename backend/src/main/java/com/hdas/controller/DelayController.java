@@ -2,7 +2,6 @@ package com.hdas.controller;
 
 import com.hdas.domain.delay.Delay;
 import com.hdas.dto.JustifyDelayRequest;
-import com.hdas.repository.DelayRepository;
 import com.hdas.service.DelayService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -19,19 +18,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DelayController {
     
-    private final DelayRepository delayRepository;
     private final DelayService delayService;
     
     @GetMapping
     @PreAuthorize("hasRole('CLERK')")
     public ResponseEntity<List<Delay>> getAllDelays() {
-        return ResponseEntity.ok(delayRepository.findAll());
+        return ResponseEntity.ok(delayService.getAllDelays());
     }
     
     @GetMapping("/assignment/{assignmentId}")
     @PreAuthorize("hasRole('CLERK')")
     public ResponseEntity<List<Delay>> getDelaysByAssignment(@PathVariable UUID assignmentId) {
-        return ResponseEntity.ok(delayRepository.findByAssignmentId(assignmentId));
+        return ResponseEntity.ok(delayService.getDelaysByAssignment(assignmentId));
     }
     
     @PostMapping("/{id}/justify")

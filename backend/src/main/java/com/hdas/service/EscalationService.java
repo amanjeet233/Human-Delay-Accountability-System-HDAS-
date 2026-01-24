@@ -98,6 +98,11 @@ public class EscalationService {
     public List<EscalationHistory> getEscalationHistory(UUID assignmentId) {
         return escalationHistoryRepository.findByAssignmentId(assignmentId);
     }
+
+    // Read operations for controllers
+    public java.util.List<EscalationRule> getActiveRules() {
+        return escalationRuleRepository.findByActiveTrue();
+    }
     
     @Transactional
     public EscalationRule createRule(com.hdas.dto.CreateEscalationRuleRequest request, HttpServletRequest httpRequest) {

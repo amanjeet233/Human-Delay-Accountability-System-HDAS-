@@ -3,7 +3,6 @@ package com.hdas.controller;
 import com.hdas.domain.user.Role;
 import com.hdas.dto.CreateRoleRequest;
 import com.hdas.dto.UpdateRoleRequest;
-import com.hdas.repository.RoleRepository;
 import com.hdas.service.RoleService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -21,18 +20,17 @@ import java.util.UUID;
 public class RoleController {
     
     private final RoleService roleService;
-    private final RoleRepository roleRepository;
     
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Role>> getAllRoles() {
-        return ResponseEntity.ok(roleRepository.findAll());
+        return ResponseEntity.ok(roleService.getAllRoles());
     }
     
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Role> getRole(@PathVariable UUID id) {
-        return roleRepository.findById(id)
+        return roleService.getRoleById(id)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }

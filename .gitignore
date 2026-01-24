@@ -19,6 +19,11 @@ dist/
 *.jar
 *.war
 
+# Monorepo subfolder outputs
+frontend/.next/
+frontend/node_modules/
+backend/logs/
+
 # Dependencies
 node_modules/
 node_modules/
@@ -30,6 +35,7 @@ node_modules/
 logs/
 *.gz
 backend/boot-dev.txt*
+**/logs/
 
 # Environment
 .env

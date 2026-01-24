@@ -2,8 +2,6 @@ package com.hdas.controller;
 
 import com.hdas.domain.escalation.EscalationRule;
 import com.hdas.dto.CreateEscalationRuleRequest;
-import com.hdas.repository.EscalationHistoryRepository;
-import com.hdas.repository.EscalationRuleRepository;
 import com.hdas.service.AuditService;
 import com.hdas.service.EscalationService;
 import com.hdas.service.FeatureFlagService;
@@ -23,8 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EscalationController {
     
-    private final EscalationRuleRepository escalationRuleRepository;
-    private final EscalationHistoryRepository escalationHistoryRepository;
+    // Repositories are accessed via EscalationService
     private final EscalationService escalationService;
     private final FeatureFlagService featureFlagService;
     private final AuditService auditService;
@@ -39,7 +36,7 @@ public class EscalationController {
                     "message", "Feature Coming Soon"
             ));
         }
-        return ResponseEntity.ok(escalationRuleRepository.findByActiveTrue());
+        return ResponseEntity.ok(escalationService.getActiveRules());
     }
     
     @PostMapping("/rules")
@@ -81,7 +78,7 @@ public class EscalationController {
         }
 
         return ResponseEntity.ok(Map.of(
-                "rules", escalationRuleRepository.findByActiveTrue(),
+            "rules", escalationService.getActiveRules(),
                 "capabilities", List.of("COOLDOWN_SECONDS", "ROLE_ROUTING", "USER_ROUTING")
         ));
     }

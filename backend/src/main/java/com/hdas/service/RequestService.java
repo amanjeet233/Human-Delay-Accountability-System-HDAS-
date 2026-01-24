@@ -314,4 +314,23 @@ public class RequestService {
         timeline.sort((a, b) -> a.getTimestamp().compareTo(b.getTimestamp()));
         return timeline;
     }
+
+    // Read operations for controllers
+    public java.util.List<Request> getAllRequests() {
+        return requestRepository.findAll();
+    }
+
+    public java.util.Optional<Request> getRequestById(UUID id) {
+        return requestRepository.findById(id);
+    }
+
+    public java.util.List<Request> getRequestsByCreatorUsername(String username) {
+        var user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        return requestRepository.findByCreatedById(user.getId());
+    }
+
+    public java.util.List<Assignment> getAssignmentsByRequest(UUID requestId) {
+        return assignmentRepository.findByRequestId(requestId);
+    }
 }

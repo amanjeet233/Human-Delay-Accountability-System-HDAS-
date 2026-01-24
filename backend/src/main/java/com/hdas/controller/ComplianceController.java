@@ -2,7 +2,6 @@ package com.hdas.controller;
 
 import com.hdas.dto.ApproveJustificationRequest;
 import com.hdas.dto.CreateJustificationRequest;
-import com.hdas.repository.DelayJustificationRepository;
 import com.hdas.service.AuditService;
 import com.hdas.service.AuditReportService;
 import com.hdas.service.ComplianceService;
@@ -27,7 +26,6 @@ import java.util.UUID;
 public class ComplianceController {
     
     private final ComplianceService complianceService;
-    private final DelayJustificationRepository justificationRepository;
     private final AuditReportService auditReportService;
     private final FeatureFlagService featureFlagService;
     private final AuditService auditService;
@@ -77,9 +75,9 @@ public class ComplianceController {
             ));
         }
         if (approved != null) {
-            return ResponseEntity.ok(justificationRepository.findByApproved(approved));
+            return ResponseEntity.ok(complianceService.getJustificationsByApproved(approved));
         }
-        return ResponseEntity.ok(justificationRepository.findAll());
+        return ResponseEntity.ok(complianceService.getAllJustifications());
     }
     
     @GetMapping("/audit-reports/csv")

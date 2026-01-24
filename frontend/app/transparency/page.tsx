@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useCapabilities } from '@/lib/hooks/useCapabilities';
 import { useRouter } from 'next/navigation';
 import { 
   Eye,
@@ -74,9 +75,7 @@ interface PublicReport {
 
 export default function TransparencyPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [featureFlags, setFeatureFlags] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, featureFlags, loading, enforceAccess } = useCapabilities();
   const [departmentStats, setDepartmentStats] = useState<DepartmentStats[]>([]);
   const [processStats, setProcessStats] = useState<ProcessStats[]>([]);
   const [metrics, setMetrics] = useState<TransparencyMetrics | null>(null);
@@ -85,19 +84,6 @@ export default function TransparencyPage() {
   const [selectedDepartment, setSelectedDepartment] = useState('all');
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-    
-    setFeatureFlags({
-      escalation: true,
-      auditCompliance: true,
-      advancedAccountability: true,
-      governanceAnalysis: true,
-      transparency: true
-    });
-
     // Mock department statistics (anonymized)
     setDepartmentStats([
       {
@@ -239,8 +225,13 @@ export default function TransparencyPage() {
       }
     ]);
     
-    setLoading(false);
+    // Loading state managed by useCapabilities for flags/user
   }, []);
+
+  // Enforce feature access using backend flag name
+  if (!enforceAccess('transparency')) {
+    return null;
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token');

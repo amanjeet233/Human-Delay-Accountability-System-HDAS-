@@ -4,7 +4,6 @@ import com.hdas.domain.process.Process;
 import com.hdas.domain.process.ProcessStep;
 import com.hdas.dto.CreateProcessRequest;
 import com.hdas.dto.CreateProcessStepRequest;
-import com.hdas.repository.ProcessRepository;
 import com.hdas.service.AuditService;
 import com.hdas.service.ProcessService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,19 +21,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProcessController {
     
-    private final ProcessRepository processRepository;
     private final ProcessService processService;
     
     @GetMapping
     @PreAuthorize("hasRole('CITIZEN')")
     public ResponseEntity<List<Process>> getAllProcesses() {
-        return ResponseEntity.ok(processRepository.findByActiveTrue());
+        return ResponseEntity.ok(processService.getActiveProcesses());
     }
     
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('CITIZEN')")
     public ResponseEntity<Process> getProcess(@PathVariable UUID id) {
-        return processRepository.findById(id)
+        return processService.getProcessById(id)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }

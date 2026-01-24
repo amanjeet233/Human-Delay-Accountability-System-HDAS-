@@ -103,8 +103,15 @@ export const authApi = {
 
 export const featureFlagsApi = {
   getFlags: async (): Promise<FeatureFlagsResponse> => {
-    const response = await apiClient.get<FeatureFlagsResponse>('/feature-flags');
-    return response.data as FeatureFlagsResponse;
+    // Align with backend admin endpoint and names; map to typed subset
+    const map = await apiClient.getFeatureFlags();
+    return {
+      escalation: !!map.escalation,
+      auditCompliance: !!map.auditCompliance,
+      advancedAccountability: !!map.advancedAccountability,
+      governanceAnalysis: !!map.governanceAnalysis,
+      transparency: !!map.transparency,
+    } as FeatureFlagsResponse;
   },
 };
 

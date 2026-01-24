@@ -2,7 +2,6 @@ package com.hdas.controller;
 
 import com.hdas.domain.sla.SLA;
 import com.hdas.dto.CreateSLARequest;
-import com.hdas.repository.SLARepository;
 import com.hdas.service.AuditService;
 import com.hdas.service.SLAService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,19 +19,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SLAController {
     
-    private final SLARepository slaRepository;
     private final SLAService slaService;
     
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<SLA>> getAllSLAs() {
-        return ResponseEntity.ok(slaRepository.findAll());
+        return ResponseEntity.ok(slaService.getAllSLAs());
     }
     
     @GetMapping("/step/{stepId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<SLA>> getSLAsByStep(@PathVariable UUID stepId) {
-        return ResponseEntity.ok(slaRepository.findByProcessStepId(stepId));
+        return ResponseEntity.ok(slaService.getSLAsByProcessStep(stepId));
     }
     
     @PostMapping

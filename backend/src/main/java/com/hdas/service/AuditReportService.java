@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import com.hdas.exception.FeatureDisabledException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -25,7 +26,7 @@ public class AuditReportService {
     
     public Resource generateCSVReport(Instant startDate, Instant endDate) throws IOException {
         if (!featureFlagService.isFeatureEnabled("auditCompliance") || !featureFlagService.isFeatureEnabled("legalEvidenceExport")) {
-            throw new RuntimeException("Feature disabled");
+            throw new FeatureDisabledException("legalEvidenceExport");
         }
         LocalDateTime start = LocalDateTime.ofInstant(startDate, ZoneId.systemDefault());
         LocalDateTime end = LocalDateTime.ofInstant(endDate, ZoneId.systemDefault());
@@ -58,7 +59,7 @@ public class AuditReportService {
     
     public Resource generatePDFReport(Instant startDate, Instant endDate) throws IOException {
         if (!featureFlagService.isFeatureEnabled("auditCompliance") || !featureFlagService.isFeatureEnabled("legalEvidenceExport")) {
-            throw new RuntimeException("Feature disabled");
+            throw new FeatureDisabledException("legalEvidenceExport");
         }
         LocalDateTime start = LocalDateTime.ofInstant(startDate, ZoneId.systemDefault());
         LocalDateTime end = LocalDateTime.ofInstant(endDate, ZoneId.systemDefault());

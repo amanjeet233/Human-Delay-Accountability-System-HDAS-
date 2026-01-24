@@ -67,4 +67,13 @@ public class SLAService {
         
         return sla;
     }
+
+    // Read operations for controllers
+    public java.util.List<SLA> getAllSLAs() {
+        return slaRepository.findAll();
+    }
+
+    public java.util.List<SLA> getSLAsByProcessStep(UUID stepId) {
+        return slaRepository.findByProcessStepId(stepId);
+    }
 }

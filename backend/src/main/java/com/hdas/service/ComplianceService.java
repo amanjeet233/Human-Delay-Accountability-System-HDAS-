@@ -84,4 +84,13 @@ public class ComplianceService {
         
         return justification;
     }
+
+    // Read operations for controllers
+    public java.util.List<DelayJustification> getAllJustifications() {
+        return justificationRepository.findAll();
+    }
+
+    public java.util.List<DelayJustification> getJustificationsByApproved(boolean approved) {
+        return justificationRepository.findByApproved(approved);
+    }
 }

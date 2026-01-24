@@ -2,7 +2,6 @@ package com.hdas.controller;
 
 import com.hdas.dto.CreateUserRequest;
 import com.hdas.dto.UpdateUserRequest;
-import com.hdas.repository.UserRepository;
 import com.hdas.security.RequirePermission;
 import com.hdas.security.RequireRole;
 import com.hdas.security.RoleBasedAccessControl;
@@ -27,7 +26,6 @@ import java.util.UUID;
 public class AdminController {
     
     private final UserService userService;
-    private final UserRepository userRepository;
     private final AuditService auditService;
     private final FeatureFlagService featureFlagService;
     
@@ -299,7 +297,7 @@ public class AdminController {
     public ResponseEntity<List<Map<String, Object>>> getAllUsers() {
         log.info("Admin viewing all users");
         
-        List<Map<String, Object>> users = userRepository.findAll().stream()
+        List<Map<String, Object>> users = userService.getAllUsers().stream()
             .map(user -> Map.<String, Object>of(
                 "id", user.getId().toString(),
                 "username", user.getUsername(),

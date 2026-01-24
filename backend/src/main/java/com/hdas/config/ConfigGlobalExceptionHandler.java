@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import com.hdas.exception.FeatureDisabledException;
 
 @ControllerAdvice
 public class ConfigGlobalExceptionHandler {
@@ -31,6 +32,17 @@ public class ConfigGlobalExceptionHandler {
             request != null ? request.getRequestURI() : "unknown"
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+
+    @ExceptionHandler(FeatureDisabledException.class)
+    public ResponseEntity<ErrorResponse> handleFeatureDisabled(FeatureDisabledException ex, HttpServletRequest request) {
+        ErrorResponse response = new ErrorResponse(
+            String.valueOf(HttpStatus.FORBIDDEN.value()),
+            "FEATURE_DISABLED",
+            "Feature Coming Soon",
+            request != null ? request.getRequestURI() : "unknown"
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

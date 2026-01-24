@@ -1,8 +1,6 @@
 package com.hdas.controller;
 
 import com.hdas.domain.request.FileAttachment;
-import com.hdas.repository.FileAttachmentRepository;
-import com.hdas.repository.RequestRepository;
 import com.hdas.service.AuditService;
 import com.hdas.service.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,8 +20,6 @@ import java.util.UUID;
 public class FileAttachmentController {
     
     private final FileStorageService fileStorageService;
-    private final FileAttachmentRepository fileAttachmentRepository;
-    private final RequestRepository requestRepository;
     private final AuditService auditService;
     
     @PostMapping("/{requestId}/attachments")
@@ -59,7 +55,7 @@ public class FileAttachmentController {
     @GetMapping("/{requestId}/attachments")
     @PreAuthorize("hasRole('CITIZEN')")
     public ResponseEntity<List<FileAttachment>> getAttachments(@PathVariable UUID requestId) {
-        return ResponseEntity.ok(fileAttachmentRepository.findByRequestId(requestId));
+        return ResponseEntity.ok(fileStorageService.getAttachmentsByRequestId(requestId));
     }
     
     @GetMapping("/attachments/{id}/download")
