@@ -3,6 +3,7 @@
 ![License](https://img.shields.io/github/license/amanjeet233/Human-Delay-Accountability-System-HDAS-)
 ![Issues](https://img.shields.io/github/issues/amanjeet233/Human-Delay-Accountability-System-HDAS-)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+![Backend Build](https://github.com/amanjeet233/Human-Delay-Accountability-System-HDAS-/actions/workflows/backend-build.yml/badge.svg)
 
 ## 📌 Overview
 Transparent, role-based SLA enforcement for public service requests — auditable workflows, delay tracking, and governance insights.
