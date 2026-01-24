@@ -1,5 +1,9 @@
 # 🚀 Human Delay Accountability System (HDAS)
 
+![License](https://img.shields.io/github/license/amanjeet233/Human-Delay-Accountability-System-HDAS-)
+![Issues](https://img.shields.io/github/issues/amanjeet233/Human-Delay-Accountability-System-HDAS-)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
 ## 📌 Overview
 Transparent, role-based SLA enforcement for public service requests — auditable workflows, delay tracking, and governance insights.
 
@@ -108,3 +112,13 @@ Dev server: `http://localhost:3001`
 ## 📜 License / Disclaimer
 - See [LICENSE](LICENSE) for terms.
 - Harden security and rotate credentials before production deployment.
+
+## 🤝 Contributing
+- Fork this repository and create a feature branch (e.g., `feat/...` or `docs/...`).
+- Follow the role boundaries and security rules — no functional changes without approval.
+- For documentation-only updates, prefer `chore/docs-*` branches.
+- Run locally:
+   - Backend: `mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=dev`
+   - Frontend: `cd frontend && npm install && npm run dev`
+   - Database: import [SCHEMA_CONSOLIDATED.sql](SCHEMA_CONSOLIDATED.sql)
+- Submit a pull request with a clear description and checklist.
