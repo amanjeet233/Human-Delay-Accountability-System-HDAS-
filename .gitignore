@@ -1,0 +1,55 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Build outputs
+/backend/target/
+/*.jar
+/.next/
+/out/
+/node_modules/
+backend/target/
+target/
+build/
+dist/
+*.class
+*.jar
+*.war
+
+# Dependencies
+node_modules/
+node_modules/
+.pnp
+.pnp.js
+
+# Logs
+*.log
+logs/
+*.gz
+backend/boot-dev.txt*
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Next.js
+.next/
+out/
+.next/
+out/
+.vercel
+
+# Temporary
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
