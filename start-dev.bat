@@ -9,21 +9,23 @@ REM - Starts Spring Boot backend (dev profile)
 REM - Starts Next.js frontend (dev server)
 REM =============================================================
 
-REM Change to repo root
-cd /d "%~dp0..\"
+REM Change to repo root (robust)
+pushd "%~dp0.." >nul
 
 REM ---- MySQL Service ----
 set "MYSQL_SERVICE=%HDAS_MYSQL_SERVICE%"
 if not defined MYSQL_SERVICE set "MYSQL_SERVICE=MySQL80"
 echo [MySQL] Checking MySQL service "%MYSQL_SERVICE%" status...
-for /f "tokens=2 delims=:" %%s in ('sc query "%MYSQL_SERVICE%" ^| findstr /R /C:"STATE"') do set SERVICE_STATE=%%s
-if /i "!SERVICE_STATE!"==" 4  RUNNING" (
+sc query "%MYSQL_SERVICE%" | findstr /C:"RUNNING" >nul
+if not errorlevel 1 (
   echo [MySQL] Service %MYSQL_SERVICE% is already running.
 ) else (
   echo [MySQL] Attempting to start service %MYSQL_SERVICE%...
-  net start "%MYSQL_SERVICE%" >nul 2>&1 && (
+  net start "%MYSQL_SERVICE%" >nul 2>&1
+  sc query "%MYSQL_SERVICE%" | findstr /C:"RUNNING" >nul
+  if not errorlevel 1 (
     echo [MySQL] Service started.
-  ) || (
+  ) else (
     echo [MySQL] Service %MYSQL_SERVICE% not found or failed to start. If MySQL runs manually, skip this.
   )
 )
@@ -33,6 +35,7 @@ REM Set IMPORT_SCHEMA=1 to import SCHEMA_CONSOLIDATED.sql using DB_USER/DB_PASS 
 REM Example (one-time): set IMPORT_SCHEMA=1 && set DB_USER=root && set DB_PASS=yourpass && start-dev.bat
 set "IMPORT_SCHEMA=%IMPORT_SCHEMA%"
 if not defined IMPORT_SCHEMA set IMPORT_SCHEMA=0
+
 REM Prepare credentials: prefer env vars if DB_USER/DB_PASS not defined
 if not defined DB_USER (
   if defined HDAS_DB_USER (
@@ -48,29 +51,34 @@ if not defined DB_PASS (
     set "DB_PASS="
   )
 )
-if "%IMPORT_SCHEMA%"=="1" (
-  if exist SCHEMA_CONSOLIDATED.sql (
-    where mysql >nul 2>&1 && (
-      if not defined DB_USER (
-        echo [Schema] DB_USER not set. Set DB_USER/DB_PASS or HDAS_DB_USER/HDAS_DB_PASS.
-      ) else (
-        if not defined DB_PASS (
-          echo [Schema] Warning: DB_PASS not set; mysql may prompt if password is required.
-          mysql -u %DB_USER% -p < SCHEMA_CONSOLIDATED.sql
-        ) else (
-          echo [Schema] Importing SCHEMA_CONSOLIDATED.sql...
-          mysql -u %DB_USER% --password=%DB_PASS% < SCHEMA_CONSOLIDATED.sql
-        )
-      )
-    ) || (
-      echo [Schema] mysql client not found in PATH. Skipping import.
-    )
-  ) else (
-    echo [Schema] SCHEMA_CONSOLIDATED.sql not found at repo root. Skipping import.
-  )
-) else (
-  echo [Schema] Import disabled (IMPORT_SCHEMA=0). Skipping.
+
+if "%IMPORT_SCHEMA%"=="1" goto DO_IMPORT
+echo [Schema] Import disabled (IMPORT_SCHEMA=0). Skipping.
+goto START_SERVICES
+
+:DO_IMPORT
+if not exist SCHEMA_CONSOLIDATED.sql (
+  echo [Schema] SCHEMA_CONSOLIDATED.sql not found at repo root. Skipping import.
+  goto START_SERVICES
 )
+where mysql >nul 2>&1
+if errorlevel 1 (
+  echo [Schema] mysql client not found in PATH. Skipping import.
+  goto START_SERVICES
+)
+if not defined DB_USER (
+  echo [Schema] DB_USER not set. Set DB_USER/DB_PASS or HDAS_DB_USER/HDAS_DB_PASS.
+  goto START_SERVICES
+)
+if not defined DB_PASS (
+  echo [Schema] Warning: DB_PASS not set; mysql may prompt if password is required.
+  mysql -u %DB_USER% -p < SCHEMA_CONSOLIDATED.sql
+) else (
+  echo [Schema] Importing SCHEMA_CONSOLIDATED.sql...
+  mysql -u %DB_USER% --password=%DB_PASS% < SCHEMA_CONSOLIDATED.sql
+)
+
+:START_SERVICES
 
 REM ---- Backend (Spring Boot dev) ----
 echo [Backend] Starting Spring Boot (dev profile) in a new window...
@@ -86,4 +94,5 @@ echo [Info] Backend: http://localhost:8080 (health: /actuator/health)
 echo [Info] Frontend: http://localhost:3001
 
 echo [Done] Dev environment launching. Windows may prompt for new terminal windows.
+popd >nul
 endlocal
