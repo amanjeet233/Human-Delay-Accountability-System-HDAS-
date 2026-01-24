@@ -27,10 +27,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AuthService {
     
-    // Hardcoded admin credentials (keep in code, NOT in database)
-    private static final String HARDCODED_ADMIN_USERNAME = "admin";
-    private static final String HARDCODED_ADMIN_PASSWORD = "admin123";
-    private static final String HARDCODED_ADMIN_EMAIL = "admin@hdas.local";
+    // No hardcoded users: all authentication must use database + BCrypt
     
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -43,43 +40,8 @@ public class AuthService {
         log.info("[TRACE_START] AuthService - Authentication attempt for user: {}", request.getUsername());
         
         try {
-            // First, try to authenticate against hardcoded admin credentials
-            if (HARDCODED_ADMIN_USERNAME.equals(request.getUsername()) &&
-                HARDCODED_ADMIN_PASSWORD.equals(request.getPassword())) {
-
-                log.info("[TRACE_INFO] AuthService - Hardcoded admin credentials matched for user: {}", request.getUsername());
-
-                // Set primary role and prepare claims (JWT will include only the primary role claim)
-                String primaryAdminRole = "ADMIN";
-                Map<String, Object> extraClaimsAdmin = new HashMap<>();
-                extraClaimsAdmin.put("role", primaryAdminRole);
-
-                // Generate token for hardcoded admin (token will include only primary role claim)
-                String token = jwtService.generateToken(extraClaimsAdmin, new org.springframework.security.core.userdetails.User(
-                    HARDCODED_ADMIN_USERNAME,
-                    HARDCODED_ADMIN_PASSWORD,
-                    org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_ADMIN")
-                ));
-
-                log.info("[TRACE_END] AuthService - Hardcoded admin authenticated successfully");
-
-                Set<String> adminRoles = new HashSet<>();
-                adminRoles.add(primaryAdminRole);
-
-                Set<String> adminPermissions = new HashSet<>();
-                adminPermissions.add("ALL_PERMISSIONS");
-
-                return AuthResponse.builder()
-                    .token(token)
-                    .username(HARDCODED_ADMIN_USERNAME)
-                    .email(HARDCODED_ADMIN_EMAIL)
-                    .role(primaryAdminRole)  // Single role for frontend routing
-                    .isSystemAdmin(true)
-                    .build();
-            }
-            
-            // Otherwise, authenticate against database users
-            log.info("[TRACE_INFO] AuthService - Checking database for user: {}", request.getUsername());
+            // Authenticate against database users only
+            log.info("[TRACE_INFO] AuthService - Authenticating against database for user: {}", request.getUsername());
 
             authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));

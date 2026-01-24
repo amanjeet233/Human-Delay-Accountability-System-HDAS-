@@ -1,0 +1,119 @@
+{
+  "tables": [
+    "role_permissions_text",
+    "escalation_history",
+    "slas_new",
+    "delegations_new",
+    "delay_debt_scores"
+  ],
+  "columns": [
+    { "table": "users", "name": "active", "type": "tinyint" },
+    { "table": "users", "name": "version_num", "type": "bigint" },
+    { "table": "users", "name": "updated_at", "type": "timestamp" },
+
+    { "table": "roles", "name": "version_num", "type": "bigint" },
+
+    { "table": "process_steps", "name": "responsible_role", "type": "varchar" },
+    { "table": "process_steps", "name": "default_sla_duration_seconds", "type": "bigint" },
+
+    { "table": "requests", "name": "started_at", "type": "timestamp" },
+    { "table": "requests", "name": "completed_at", "type": "timestamp" },
+    { "table": "requests", "name": "created_by_id", "type": "binary", "length": 16 },
+
+    { "table": "file_attachments", "name": "content_type", "type": "varchar" },
+    { "table": "file_attachments", "name": "storage_path", "type": "varchar" },
+    { "table": "file_attachments", "name": "description", "type": "varchar" },
+
+    { "table": "assignments", "name": "assigned_by_id", "type": "binary", "length": 16 },
+    { "table": "assignments", "name": "notes", "type": "text" },
+
+    { "table": "delays", "name": "responsible_user_id", "type": "binary", "length": 16 },
+    { "table": "delays", "name": "justification", "type": "text" },
+    { "table": "delays", "name": "justified_by_id", "type": "binary", "length": 16 },
+    { "table": "delays", "name": "justified_at", "type": "timestamp" },
+    { "table": "delays", "name": "is_justified", "type": "tinyint" },
+    { "table": "delays", "name": "original_assignment_id", "type": "binary", "length": 16 },
+    { "table": "delays", "name": "is_shadow_delay", "type": "tinyint" },
+
+    { "table": "delay_justifications", "name": "justification_text", "type": "text" },
+    { "table": "delay_justifications", "name": "approved_by_id", "type": "binary", "length": 16 },
+    { "table": "delay_justifications", "name": "approved_at", "type": "timestamp" },
+
+    { "table": "escalation_rules", "name": "process_step_id", "type": "binary", "length": 16 },
+    { "table": "escalation_rules", "name": "threshold_percentage", "type": "int" },
+    { "table": "escalation_rules", "name": "cooldown_seconds", "type": "bigint" },
+    { "table": "escalation_rules", "name": "escalation_user_id", "type": "binary", "length": 16 },
+
+    { "table": "feature_flags", "name": "impact", "type": "varchar" },
+    { "table": "feature_flags", "name": "updated_by", "type": "varchar" },
+    { "table": "feature_flags", "name": "updated_at", "type": "timestamp" },
+    { "table": "feature_flags", "name": "required_roles", "type": "json" },
+    { "table": "feature_flags", "name": "dependencies", "type": "json" },
+
+    { "table": "audit_logs", "name": "user_agent", "type": "varchar" },
+    { "table": "audit_logs", "name": "legal_hold_reason", "type": "text" },
+    { "table": "audit_logs", "name": "legal_hold_by", "type": "varchar" },
+    { "table": "audit_logs", "name": "legal_hold_at", "type": "timestamp" }
+  ],
+  "uniqueIndexes": [
+    { "table": "users", "columns": ["email"] },
+    { "table": "users", "columns": ["username"] },
+    { "table": "roles", "columns": ["name"] }
+  ],
+  "uuidColumns": [
+    { "table": "users", "name": "id_uuid" },
+    { "table": "roles", "name": "id_uuid" },
+    { "table": "process_steps", "name": "id_uuid" },
+    { "table": "requests", "name": "id_uuid" },
+    { "table": "assignments", "name": "id_uuid" },
+    { "table": "file_attachments", "name": "id_uuid" },
+    { "table": "delays", "name": "id_uuid" }
+  ],
+  "tableEntityMap": {
+    "users": "User",
+    "roles": "Role",
+    "process_steps": "ProcessStep",
+    "requests": "Request",
+    "file_attachments": "FileAttachment",
+    "assignments": "Assignment",
+    "delays": "Delay",
+    "delay_justifications": "DelayJustification",
+    "escalation_rules": "EscalationRule",
+    "feature_flags": "FeatureFlag",
+    "audit_logs": "AuditLog",
+    "role_permissions_text": "RolePermissionsText",
+    "escalation_history": "EscalationHistory",
+    "slas_new": "SLA",
+    "delegations_new": "Delegation",
+    "delay_debt_scores": "DelayDebtScore"
+  },
+  "foreignKeysOptional": [
+    { "table": "requests", "column": "created_by_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+
+    { "table": "assignments", "column": "assigned_by_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+
+    { "table": "delays", "column": "responsible_user_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "delays", "column": "justified_by_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "delays", "column": "original_assignment_id", "refTable": "assignments", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+
+    { "table": "delay_justifications", "column": "approved_by_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+
+    { "table": "escalation_rules", "column": "process_step_id", "refTable": "process_steps", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "escalation_rules", "column": "escalation_user_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+
+    { "table": "escalation_history", "column": "assignment_id", "refTable": "assignments", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "escalation_history", "column": "escalated_to_user_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "escalation_history", "column": "escalated_from_user_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "escalation_history", "column": "escalated_to_role_id", "refTable": "roles", "refColumn": "id", "requireType": { "column": { "type": "bigint" }, "ref": { "type": "bigint" } } },
+
+    { "table": "slas_new", "column": "process_step_id", "refTable": "process_steps", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "slas_new", "column": "role_id", "refTable": "roles", "refColumn": "id", "requireType": { "column": { "type": "bigint" }, "ref": { "type": "bigint" } } },
+
+    { "table": "delegations_new", "column": "assignment_id", "refTable": "assignments", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "delegations_new", "column": "original_user_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "delegations_new", "column": "delegated_to_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+
+    { "table": "delay_debt_scores", "column": "user_id", "refTable": "users", "refColumn": "id_uuid", "requireType": { "column": { "type": "binary", "length": 16 }, "ref": { "type": "binary", "length": 16 } } },
+    { "table": "delay_debt_scores", "column": "role_id", "refTable": "roles", "refColumn": "id", "requireType": { "column": { "type": "bigint" }, "ref": { "type": "bigint" } } }
+  ]
+}

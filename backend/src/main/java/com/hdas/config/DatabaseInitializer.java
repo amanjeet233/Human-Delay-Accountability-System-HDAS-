@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ public class DatabaseInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final Environment environment;
     
     @Override
     @Transactional
@@ -50,6 +52,12 @@ public class DatabaseInitializer implements CommandLineRunner {
     }
     
     private void initializeAdminUser() {
+        // Skip creating DB admin user when running in 'simple' profile (hardcoded admin available)
+        boolean isSimpleProfile = java.util.Arrays.asList(environment.getActiveProfiles()).contains("simple");
+        if (isSimpleProfile) {
+            log.info("Simple profile active: skipping default admin DB user (hardcoded admin handled in AuthService)");
+            return;
+        }
         // Check if admin user already exists
         if (userService.getUserCount() == 0) {
             Role adminRole = roleRepository.findByName("ADMIN")

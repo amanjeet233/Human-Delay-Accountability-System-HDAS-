@@ -82,6 +82,16 @@ npm run dev
 ```
 Dev server: `http://localhost:3001`
 
+## 🧰 Dev Scripts
+- [start-dev.bat](start-dev.bat): Starts MySQL (Windows service), backend, and frontend in separate windows. Optional schema import via `IMPORT_SCHEMA=1`.
+- [start-dev.ps1](start-dev.ps1): PowerShell variant with the same behavior; opens new terminals for backend/frontend.
+- [git-push.bat](git-push.bat): Helper to stage, prompt for commit message, and push current branch.
+- Env vars: `HDAS_DB_USER`, `HDAS_DB_PASS`, `HDAS_MYSQL_SERVICE` (default `MySQL80`), `IMPORT_SCHEMA=1` to import [SCHEMA_CONSOLIDATED.sql](SCHEMA_CONSOLIDATED.sql).
+
+Examples:
+- Windows CMD: `set IMPORT_SCHEMA=1 && set DB_USER=root && set DB_PASS=pass123 && start-dev.bat`
+- PowerShell: `./start-dev.ps1 -ImportSchema -DbUser root -DbPass pass123`
+
 ## 🔑 Admin Credentials (DEV ONLY ⚠️)
 - Provisioned via seeds or environment config in development.
 - Rotate credentials and configure secrets per environment; never reuse dev creds in production.
