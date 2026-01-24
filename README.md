@@ -1,62 +1,125 @@
-# Human Delay Accountability System (HDAS)
+# 🚀 Human Delay Accountability System (HDAS)
 
-HDAS is a role-based accountability platform for tracking government service requests, enforcing SLA timelines, and maintaining an auditable lifecycle of decisions across departments. It addresses delay transparency by routing requests through defined roles with secure, traceable actions and controlled access.
+![License](https://img.shields.io/github/license/amanjeet233/Human-Delay-Accountability-System-HDAS-)
+![Issues](https://img.shields.io/github/issues/amanjeet233/Human-Delay-Accountability-System-HDAS-)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+![Backend Build](https://github.com/amanjeet233/Human-Delay-Accountability-System-HDAS-/actions/workflows/backend-build.yml/badge.svg)
 
-## Tech Stack
+## 📌 Overview
+Transparent, role-based SLA enforcement for public service requests — auditable workflows, delay tracking, and governance insights.
 
-Backend: Spring Boot 3.2, Java 21, Spring Security, JWT, Hibernate, MySQL
-Frontend: Next.js (App Router), React, Axios
-Auth: JWT-based role authentication
+## 🧱 Architecture
+| Layer | Technology |
+|-----|------------|
+| Frontend | Next.js (App Router) |
+| Backend | Spring Boot (Java 21) |
+| Security | JWT + Spring Security (BCrypt) |
+| Database | MySQL 8 (InnoDB, utf8mb4) |
 
-## Roles and Responsibilities
+## 👥 User Roles
+| Role | Icon | Responsibility |
+|----|----|----|
+| Admin | 🛠️ | Users, roles, processes, SLA, feature flags |
+| Citizen | 👤 | Submit requests, upload documents, track timeline |
+| Clerk | 🧾 | Verify requests, add delay reasons, forward |
+| Section Officer | 🗂️ | Approve/reject/forward verified requests |
+| HOD | 🏛️ | Final decisions, department SLA oversight |
+| Auditor | 🔍 | Read-only audits and transparency views |
 
-- Admin: system configuration, users, roles, feature flags
-- Citizen: submit and track own requests
-- Clerk: verify and forward assigned requests, add delay reasons
-- Section Officer: review and approve/reject/forward requests
-- HOD: final approve/reject, department-level decisions
-- Auditor: audit logs and legal hold actions
+## ⚙️ Core Features
+- ⏱ SLA Tracking
+- 📈 Escalation Engine
+- 🔐 Role-based Access (RBAC)
+- 🧾 Audit Logs
+- 🚦 Feature Flags
 
-## Features
+## 🔐 Authentication & Security
+- JWT-based authentication
+- BCrypt password hashing
+- Strict role-permission mapping on API endpoints and UI routes
+- Profiles: `dev`/`prod` (secure), `simple` (permissive, dev-only)
 
-- Role-based request lifecycle
-- Escalation and delay tracking
-- Audit logging
-- Secure JWT authentication and RBAC
-- PDF/report support
-- Feature-flag-based future modules
+## 🚩 Feature Flags
+| Flag | Module | Status | Notes |
+|---|---|---|---|
+| escalation | Escalation flows | Enabled | SO → HOD escalation actions |
+| audit | Audit logs | UI Ready | Backend export endpoints in progress |
+| compliance | Compliance dashboard | UI Ready | Backend aggregates pending |
+| transparency | Read-only datasets | UI Ready | Policy-based redaction pending |
 
-## Folder Structure
+## 🗄️ Database Overview
+- UUID primary keys (`BINARY(16)`) with normalized relations and indexes
+- Master schema + seeds in [SCHEMA_CONSOLIDATED.sql](SCHEMA_CONSOLIDATED.sql) (idempotent)
+- Validation-friendly structure for Hibernate/JPA
 
-- /backend
-- /frontend
-- README.md
-- start-backend.ps1
-- start-frontend.ps1
+## ▶️ Setup & Run
+### Database (MySQL 8)
+```powershell
+# Interactive
+mysql -u <user> -p < SCHEMA_CONSOLIDATED.sql
 
-## How to Run (Local)
+# Non-interactive
+mysql -u <user> --password=<password> < SCHEMA_CONSOLIDATED.sql
+```
+Update DB settings in [backend/src/main/resources/application.yml](backend/src/main/resources/application.yml).
 
-### Backend (Java 21, Port 8081)
+### Backend (Spring Boot)
+```powershell
+# Dev run (port 8080)
+mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=dev
 
-1. Ensure Java 21 and MySQL are available.
-2. Update database settings in backend/src/main/resources/application.yml.
-3. Run PowerShell: start-backend.ps1
-
-Backend runs at http://localhost:8081.
+# Package + run
+mvn -f backend/pom.xml clean package
+java -jar backend/target/human-delay-accountability-system-1.0.0.jar --spring.profiles.active=dev
+```
+Health check: `http://localhost:8080/actuator/health`
 
 ### Frontend (Next.js)
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+Dev server: `http://localhost:3001`
 
-1. Install dependencies: frontend/npm install
-2. Run PowerShell: start-frontend.ps1
+## 🔑 Admin Credentials (DEV ONLY ⚠️)
+- Provisioned via seeds or environment config in development.
+- Rotate credentials and configure secrets per environment; never reuse dev creds in production.
 
-Frontend runs at http://localhost:3001.
+## 📂 Folder Structure
+```text
+.
+├─ backend/
+│  ├─ src/main/java/... (controllers, services, config)
+│  ├─ src/main/resources/
+│  │  └─ application.yml
+│  └─ pom.xml
+├─ frontend/
+│  ├─ app/ (role dashboards, pages)
+│  ├─ components/ (shared UI)
+│  ├─ lib/ (api client, auth, feature flags)
+│  └─ package.json
+├─ docs/ (reports, migration runbooks, audits)
+├─ SCHEMA_CONSOLIDATED.sql
+├─ README.md
+└─ scripts/
+   └─ phase-validation/ (validation utilities)
+```
 
-## Security Notes
+## 📊 Project Status
+- Stable and ready for demo/submission
+- Backend/Frontend verified; analytics/export wiring under iteration
 
-- JWT is required for all protected APIs.
-- Role-based API access is enforced.
+## 📜 License / Disclaimer
+- See [LICENSE](LICENSE) for terms.
+- Harden security and rotate credentials before production deployment.
 
-## Status
-
-- Core features implemented
-- Future features are guarded by feature flags
+## 🤝 Contributing
+- Fork this repository and create a feature branch (e.g., `feat/...` or `docs/...`).
+- Follow the role boundaries and security rules — no functional changes without approval.
+- For documentation-only updates, prefer `chore/docs-*` branches.
+- Run locally:
+   - Backend: `mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=dev`
+   - Frontend: `cd frontend && npm install && npm run dev`
+   - Database: import [SCHEMA_CONSOLIDATED.sql](SCHEMA_CONSOLIDATED.sql)
+- Submit a pull request with a clear description and checklist.
