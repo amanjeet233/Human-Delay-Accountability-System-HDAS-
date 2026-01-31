@@ -7,9 +7,11 @@ import com.hdas.repository.ProcessStepRepository;
 import com.hdas.repository.SLARepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -22,7 +24,7 @@ public class SLAService {
     
     @Transactional
     public SLA createSLA(CreateSLARequest request, HttpServletRequest httpRequest) {
-        ProcessStep step = processStepRepository.findById(request.getProcessStepId())
+        ProcessStep step = processStepRepository.findById(Objects.requireNonNull(request.getProcessStepId()))
             .orElseThrow(() -> new RuntimeException("Process step not found"));
         
         SLA sla = SLA.builder()
@@ -34,7 +36,7 @@ public class SLAService {
             .active(true)
             .build();
         
-        sla = slaRepository.save(sla);
+        sla = slaRepository.save(Objects.requireNonNull(sla));
         
         auditService.logWithRequest("CREATE_SLA", "SLA", sla.getId(),
             null, String.valueOf(sla.getAllowedDurationSeconds()), "SLA created for step: " + step.getName(), httpRequest);
@@ -43,8 +45,8 @@ public class SLAService {
     }
     
     @Transactional
-    public SLA updateSLA(UUID id, CreateSLARequest request, HttpServletRequest httpRequest) {
-        SLA sla = slaRepository.findById(id)
+    public SLA updateSLA(@NonNull UUID id, CreateSLARequest request, HttpServletRequest httpRequest) {
+        SLA sla = slaRepository.findById(Objects.requireNonNull(id))
             .orElseThrow(() -> new RuntimeException("SLA not found"));
         
         String oldValue = String.valueOf(sla.getAllowedDurationSeconds());
@@ -59,7 +61,7 @@ public class SLAService {
             sla.setActive(request.getActive());
         }
         
-        sla = slaRepository.save(sla);
+        sla = slaRepository.save(Objects.requireNonNull(sla));
         
         String newValue = String.valueOf(sla.getAllowedDurationSeconds());
         auditService.logWithRequest("UPDATE_SLA", "SLA", id,
@@ -73,7 +75,7 @@ public class SLAService {
         return slaRepository.findAll();
     }
 
-    public java.util.List<SLA> getSLAsByProcessStep(UUID stepId) {
-        return slaRepository.findByProcessStepId(stepId);
+    public java.util.List<SLA> getSLAsByProcessStep(@NonNull UUID stepId) {
+        return slaRepository.findByProcessStepId(Objects.requireNonNull(stepId));
     }
 }

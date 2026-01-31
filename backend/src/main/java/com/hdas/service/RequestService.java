@@ -10,6 +10,7 @@ import com.hdas.domain.user.User;
 import com.hdas.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -38,8 +40,8 @@ public class RequestService {
     private final SLAExclusionRuleRepository slaExclusionRuleRepository;
     
     @Transactional
-    public Request createRequest(UUID processId, String title, String description, HttpServletRequest httpRequest) {
-        Process process = processRepository.findById(processId)
+    public Request createRequest(@NonNull UUID processId, String title, String description, HttpServletRequest httpRequest) {
+        Process process = processRepository.findById(Objects.requireNonNull(processId))
             .orElseThrow(() -> new RuntimeException("Process not found"));
         
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -55,9 +57,9 @@ public class RequestService {
             .startedAt(Instant.now())
             .build();
         
-        request = requestRepository.save(request);
+        request = requestRepository.save(Objects.requireNonNull(request));
         
-        List<ProcessStep> steps = processStepRepository.findByProcessIdOrderBySequenceOrderAsc(processId);
+        List<ProcessStep> steps = processStepRepository.findByProcessIdOrderBySequenceOrderAsc(Objects.requireNonNull(processId));
         if (!steps.isEmpty()) {
             ProcessStep firstStep = steps.get(0);
             createAssignment(request, firstStep, creator.getId(), httpRequest);
@@ -71,7 +73,7 @@ public class RequestService {
     
     @Transactional
     public Assignment createAssignment(Request request, ProcessStep step, UUID assignedById, HttpServletRequest httpRequest) {
-        User assignedTo = determineAssignee(step, assignedById);
+        User assignedTo = determineAssignee(step, Objects.requireNonNull(assignedById));
         
         Long allowedDuration = determineSlaDuration(step, assignedTo, httpRequest);
         
@@ -85,7 +87,7 @@ public class RequestService {
             .allowedDurationSeconds(allowedDuration)
             .build();
         
-        assignment = assignmentRepository.save(assignment);
+        assignment = assignmentRepository.save(java.util.Objects.requireNonNull(assignment));
         
         auditService.logWithRequest("CREATE_ASSIGNMENT", "Assignment", assignment.getId(),
             null, assignment.getStatus(), "Assignment created for step: " + step.getName(), httpRequest);
@@ -94,8 +96,8 @@ public class RequestService {
     }
     
     @Transactional
-    public Assignment startAssignment(UUID assignmentId, HttpServletRequest httpRequest) {
-        Assignment assignment = assignmentRepository.findById(assignmentId)
+    public Assignment startAssignment(@NonNull UUID assignmentId, HttpServletRequest httpRequest) {
+        Assignment assignment = assignmentRepository.findById(Objects.requireNonNull(assignmentId))
             .orElseThrow(() -> new RuntimeException("Assignment not found"));
         
         if (!"PENDING".equals(assignment.getStatus())) {
@@ -104,7 +106,7 @@ public class RequestService {
         
         assignment.setStatus("IN_PROGRESS");
         assignment.setStartedAt(Instant.now());
-        assignment = assignmentRepository.save(assignment);
+        assignment = assignmentRepository.save(Objects.requireNonNull(assignment));
         
         auditService.logWithRequest("START_ASSIGNMENT", "Assignment", assignmentId,
             "PENDING", "IN_PROGRESS", "Assignment started", httpRequest);
@@ -113,8 +115,8 @@ public class RequestService {
     }
     
     @Transactional
-    public Assignment completeAssignment(UUID assignmentId, String action, String notes, HttpServletRequest httpRequest) {
-        Assignment assignment = assignmentRepository.findById(assignmentId)
+    public Assignment completeAssignment(@NonNull UUID assignmentId, String action, String notes, HttpServletRequest httpRequest) {
+        Assignment assignment = assignmentRepository.findById(Objects.requireNonNull(assignmentId))
             .orElseThrow(() -> new RuntimeException("Assignment not found"));
         
         if (!"IN_PROGRESS".equals(assignment.getStatus())) {
@@ -150,7 +152,7 @@ public class RequestService {
             assignment.setStatus("FORWARDED");
         }
         
-        assignment = assignmentRepository.save(assignment);
+        assignment = assignmentRepository.save(Objects.requireNonNull(assignment));
         
         auditService.logWithRequest("COMPLETE_ASSIGNMENT", "Assignment", assignmentId,
             "IN_PROGRESS", assignment.getStatus(), "Assignment completed with action: " + action, httpRequest);
@@ -170,7 +172,7 @@ public class RequestService {
             .isShadowDelay(false)
             .build();
         
-        delay = delayRepository.save(delay);
+        delay = delayRepository.save(Objects.requireNonNull(delay));
         
         auditService.logWithRequest("CREATE_DELAY", "Delay", delay.getId(),
             null, String.valueOf(delaySeconds), "Delay detected: " + reason, httpRequest);
@@ -178,7 +180,7 @@ public class RequestService {
         return delay;
     }
     
-    private User determineAssignee(ProcessStep step, UUID assignedById) {
+    private User determineAssignee(ProcessStep step, @NonNull UUID assignedById) {
         if (step.getResponsibleRole() != null) {
             // Find users with the specified role
             List<User> usersWithRole = userRepository.findAll().stream()
@@ -192,7 +194,7 @@ public class RequestService {
             }
         }
         // Fallback to the user who created the request
-        return userRepository.findById(assignedById)
+        return userRepository.findById(Objects.requireNonNull(assignedById))
             .orElseThrow(() -> new RuntimeException("User not found"));
     }
     
@@ -260,8 +262,8 @@ public class RequestService {
         }
     }
     
-    public List<com.hdas.dto.RequestTimelineItem> getRequestTimeline(UUID requestId) {
-        Request request = requestRepository.findById(requestId)
+    public List<com.hdas.dto.RequestTimelineItem> getRequestTimeline(@NonNull UUID requestId) {
+        Request request = requestRepository.findById(Objects.requireNonNull(requestId))
             .orElseThrow(() -> new RuntimeException("Request not found"));
         
         List<com.hdas.dto.RequestTimelineItem> timeline = new ArrayList<>();
@@ -275,7 +277,7 @@ public class RequestService {
             .build());
         
         // Add assignments
-        List<Assignment> assignments = assignmentRepository.findByRequestId(requestId);
+        List<Assignment> assignments = assignmentRepository.findByRequestId(Objects.requireNonNull(requestId));
         for (Assignment assignment : assignments) {
             timeline.add(com.hdas.dto.RequestTimelineItem.builder()
                 .timestamp(assignment.getAssignedAt())
@@ -320,8 +322,8 @@ public class RequestService {
         return requestRepository.findAll();
     }
 
-    public java.util.Optional<Request> getRequestById(UUID id) {
-        return requestRepository.findById(id);
+    public java.util.Optional<Request> getRequestById(@NonNull UUID id) {
+        return requestRepository.findById(Objects.requireNonNull(id));
     }
 
     public java.util.List<Request> getRequestsByCreatorUsername(String username) {
@@ -330,7 +332,7 @@ public class RequestService {
         return requestRepository.findByCreatedById(user.getId());
     }
 
-    public java.util.List<Assignment> getAssignmentsByRequest(UUID requestId) {
-        return assignmentRepository.findByRequestId(requestId);
+    public java.util.List<Assignment> getAssignmentsByRequest(@NonNull UUID requestId) {
+        return assignmentRepository.findByRequestId(Objects.requireNonNull(requestId));
     }
 }

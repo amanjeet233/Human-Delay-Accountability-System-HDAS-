@@ -1,162 +1,137 @@
-import { apiClient } from './apiClient';
+import axios, { AxiosInstance, AxiosError } from 'axios';
 
-const api = {
-  get: apiClient.get.bind(apiClient),
-  post: apiClient.post.bind(apiClient),
-  put: apiClient.put.bind(apiClient),
-  delete: apiClient.delete.bind(apiClient),
-};
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-export default api;
+class ApiClient {
+  private client: AxiosInstance;
 
-export interface AuthRequest {
-  username: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  username: string;
-  email: string;
-  role: string;
-  roles: string[];
-  permissions: string[];
-  success: boolean;
-  message: string;
-}
-
-export interface FeatureFlagsResponse {
-  escalation: boolean;
-  auditCompliance: boolean;
-  advancedAccountability: boolean;
-  governanceAnalysis: boolean;
-  transparency: boolean;
-}
-
-export interface Request {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  startedAt: string;
-  completedAt?: string;
-  process: {
-    id: string;
-    name: string;
-    version: string;
-  };
-  createdBy: {
-    id: string;
-    username: string;
-    email: string;
-  };
-}
-
-export interface Assignment {
-  id: string;
-  status: string;
-  assignedAt: string;
-  startedAt?: string;
-  completedAt?: string;
-  allowedDurationSeconds?: number;
-  actualDurationSeconds?: number;
-  processStep: {
-    id: string;
-    name: string;
-    sequenceOrder: number;
-  };
-  assignedTo: {
-    id: string;
-    username: string;
-    email: string;
-  };
-}
-
-export interface Delay {
-  id: string;
-  delaySeconds: number;
-  reason?: string;
-  reasonCategory?: string;
-  detectedAt: string;
-  justified: boolean;
-  responsibleUser: {
-    id: string;
-    username: string;
-  };
-}
-
-export interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  active: boolean;
-  createdAt: string;
-  lastLoginAt?: string;
-}
-
-export const authApi = {
-  login: async (credentials: AuthRequest): Promise<AuthResponse> => {
-    return apiClient.login(credentials);
-  },
-};
-
-export const featureFlagsApi = {
-  getFlags: async (): Promise<FeatureFlagsResponse> => {
-    // Align with backend admin endpoint and names; map to typed subset
-    const map = await apiClient.getFeatureFlags();
-    return {
-      escalation: !!map.escalation,
-      auditCompliance: !!map.auditCompliance,
-      advancedAccountability: !!map.advancedAccountability,
-      governanceAnalysis: !!map.governanceAnalysis,
-      transparency: !!map.transparency,
-    } as FeatureFlagsResponse;
-  },
-};
-
-export const requestsApi = {
-  getAll: async (): Promise<Request[]> => {
-    const response = await apiClient.get<Request[]>('/requests');
-    return response.data as Request[];
-  },
-  getById: async (id: string): Promise<Request> => {
-    const response = await apiClient.get<Request>(`/requests/${id}`);
-    return response.data as Request;
-  },
-  create: async (data: { processId: string; title: string; description: string }): Promise<Request> => {
-    const response = await apiClient.post<Request>('/requests', data);
-    return response.data as Request;
-  },
-};
-
-export const assignmentsApi = {
-  start: async (assignmentId: string): Promise<Assignment> => {
-    const response = await apiClient.post<Assignment>(`/requests/assignments/${assignmentId}/start`);
-    return response.data as Assignment;
-  },
-  complete: async (assignmentId: string, action: string, notes?: string): Promise<Assignment> => {
-    const response = await apiClient.post<Assignment>(`/requests/assignments/${assignmentId}/complete`, {
-      action,
-      notes,
+  constructor() {
+    this.client = axios.create({
+      baseURL: `${API_URL}/api`,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
-    return response.data as Assignment;
-  },
-};
 
-export const usersApi = {
-  getAll: async (): Promise<any[]> => {
-    const response = await apiClient.get('/admin/users');
-    return response.data as any[];
-  },
-};
+    this.setupInterceptors();
+  }
 
-// REMOVED: rolesApi - Frontend must NOT discover or enumerate available roles.
-// Single role is assigned by backend at login; no frontend role discovery allowed.
+  private setupInterceptors() {
+    // Request interceptor - add JWT token
+    this.client.interceptors.request.use(
+      (config) => {
+        if (typeof window !== 'undefined') {
+          const token = localStorage.getItem('token');
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
 
-export const processesApi = {
-  getAll: async (): Promise<any[]> => {
-    const response = await apiClient.get('/processes');
-    return response.data as any[];
-  },
-};
+    // Response interceptor - handle errors
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error: AxiosError) => {
+        if (error.response?.status === 401) {
+          // Unauthorized - clear token and redirect
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  // Auth endpoints
+  async login(username: string, password: string) {
+    const response = await this.client.post('/auth/login', { username, password });
+    return response.data;
+  }
+
+  async getMe() {
+    const response = await this.client.get('/auth/me');
+    return response.data;
+  }
+
+  async logout() {
+    await this.client.post('/auth/logout');
+  }
+
+  // User management
+  async getUsers() {
+    const response = await this.client.get('/admin/users');
+    return response.data;
+  }
+
+  async createUser(data: any) {
+    const response = await this.client.post('/admin/users', data);
+    return response.data;
+  }
+
+  async updateUser(id: string, data: any) {
+    const response = await this.client.put(`/admin/users/${id}`, data);
+    return response.data;
+  }
+
+  async assignRole(id: string, role: string) {
+    const response = await this.client.put(`/admin/users/${id}/role`, { role });
+    return response.data;
+  }
+
+  async resetPassword(id: string, newPassword: string) {
+    const response = await this.client.put(`/admin/users/${id}/reset-password`, { newPassword });
+    return response.data;
+  }
+
+  // Roles
+  async getRoles() {
+    const response = await this.client.get('/admin/roles');
+    return response.data;
+  }
+
+  // Feature flags
+  async getFeatureFlags() {
+    const response = await this.client.get('/admin/feature-flags');
+    return response.data;
+  }
+
+  async toggleFeatureFlag(id: string, enabled: boolean) {
+    const response = await this.client.put(`/admin/feature-flags/${id}`, { enabled });
+    return response.data;
+  }
+
+  // Dashboard stats
+  async getDashboardStats() {
+    const response = await this.client.get('/dashboard/stats');
+    return response.data;
+  }
+
+  // Generic methods
+  async get(url: string) {
+    const response = await this.client.get(url);
+    return response.data;
+  }
+
+  async post(url: string, data?: any) {
+    const response = await this.client.post(url, data);
+    return response.data;
+  }
+
+  async put(url: string, data?: any) {
+    const response = await this.client.put(url, data);
+    return response.data;
+  }
+
+  async delete(url: string) {
+    const response = await this.client.delete(url);
+    return response.data;
+  }
+}
+
+export const api = new ApiClient();

@@ -6,6 +6,7 @@ import com.hdas.repository.FileAttachmentRepository;
 import com.hdas.repository.RequestRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -31,8 +33,8 @@ public class FileStorageService {
     private static final String UPLOAD_DIR = "uploads";
     
     @Transactional
-    public FileAttachment storeFile(UUID requestId, MultipartFile file, String description, HttpServletRequest httpRequest) {
-        Request request = requestRepository.findById(requestId)
+    public FileAttachment storeFile(@NonNull UUID requestId, MultipartFile file, String description, HttpServletRequest httpRequest) {
+        Request request = requestRepository.findById(Objects.requireNonNull(requestId))
             .orElseThrow(() -> new RuntimeException("Request not found"));
         
         try {
@@ -63,7 +65,7 @@ public class FileStorageService {
                 .description(description)
                 .build();
             
-            attachment = fileAttachmentRepository.save(attachment);
+            attachment = fileAttachmentRepository.save(Objects.requireNonNull(attachment));
             
             auditService.logWithRequest("UPLOAD_FILE", "FileAttachment", attachment.getId(),
                 null, originalFilename, "File uploaded: " + originalFilename, httpRequest);
@@ -74,13 +76,13 @@ public class FileStorageService {
         }
     }
     
-    public ResponseEntity<Resource> downloadFile(UUID id) {
-        FileAttachment attachment = fileAttachmentRepository.findById(id)
+    public ResponseEntity<Resource> downloadFile(@NonNull UUID id) {
+        FileAttachment attachment = fileAttachmentRepository.findById(Objects.requireNonNull(id))
             .orElseThrow(() -> new RuntimeException("File not found"));
         
         try {
             Path filePath = Paths.get(attachment.getStoragePath());
-            Resource resource = new UrlResource(filePath.toUri());
+            Resource resource = new UrlResource(Objects.requireNonNull(filePath.toUri()));
             
             if (resource.exists() && resource.isReadable()) {
                 return ResponseEntity.ok()
@@ -96,7 +98,7 @@ public class FileStorageService {
     }
 
     // Read operations for controllers
-    public java.util.List<FileAttachment> getAttachmentsByRequestId(UUID requestId) {
-        return fileAttachmentRepository.findByRequestId(requestId);
+    public java.util.List<FileAttachment> getAttachmentsByRequestId(@NonNull UUID requestId) {
+        return fileAttachmentRepository.findByRequestId(Objects.requireNonNull(requestId));
     }
 }

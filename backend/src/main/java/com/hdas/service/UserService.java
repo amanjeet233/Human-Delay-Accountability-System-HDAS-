@@ -8,11 +8,13 @@ import com.hdas.repository.RoleRepository;
 import com.hdas.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -38,7 +40,7 @@ public class UserService {
         Set<Role> roles = new HashSet<>();
         if (request.getRoleIds() != null) {
             roles = request.getRoleIds().stream()
-                .map(roleId -> roleRepository.findById(roleId)
+                .map(roleId -> roleRepository.findById(Objects.requireNonNull(roleId))
                     .orElseThrow(() -> new RuntimeException("Role not found: " + roleId)))
                 .collect(Collectors.toSet());
         }
@@ -54,7 +56,7 @@ public class UserService {
             .roles(new HashSet<>(roles))
             .build();
         
-        user = userRepository.save(user);
+        user = userRepository.save(Objects.requireNonNull(user));
         
         auditService.logWithRequest("CREATE_USER", "User", user.getId(),
             null, user.getUsername(), "User created: " + user.getUsername(), httpRequest);
@@ -63,8 +65,8 @@ public class UserService {
     }
     
     @Transactional
-    public User updateUser(UUID id, UpdateUserRequest request, HttpServletRequest httpRequest) {
-        User user = userRepository.findById(id)
+    public User updateUser(@NonNull UUID id, UpdateUserRequest request, HttpServletRequest httpRequest) {
+        User user = userRepository.findById(Objects.requireNonNull(id))
             .orElseThrow(() -> new RuntimeException("User not found"));
         
         String oldValue = user.getEmail() + "|" + user.getActive();
@@ -89,13 +91,13 @@ public class UserService {
         }
         if (request.getRoleIds() != null) {
             Set<Role> roles = request.getRoleIds().stream()
-                .map(roleId -> roleRepository.findById(roleId)
+                .map(roleId -> roleRepository.findById(Objects.requireNonNull(roleId))
                     .orElseThrow(() -> new RuntimeException("Role not found: " + roleId)))
                 .collect(Collectors.toSet());
             user.setRoles(new HashSet<>(roles));
         }
         
-        user = userRepository.save(user);
+        user = userRepository.save(Objects.requireNonNull(user));
         
         String newValue = user.getEmail() + "|" + user.getActive();
         auditService.logWithRequest("UPDATE_USER", "User", id,
@@ -105,8 +107,8 @@ public class UserService {
     }
     
     @Transactional
-    public User updateUserRole(UUID userId, String roleName, HttpServletRequest httpRequest) {
-        User user = userRepository.findById(userId)
+    public User updateUserRole(@NonNull UUID userId, String roleName, HttpServletRequest httpRequest) {
+        User user = userRepository.findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         
         Role role = roleRepository.findByName(roleName)
@@ -115,7 +117,7 @@ public class UserService {
         user.getRoles().clear();
         user.getRoles().add(role);
         
-        User updatedUser = userRepository.save(user);
+        User updatedUser = userRepository.save(Objects.requireNonNull(user));
         
         auditService.logAction(
             "USER_ROLE_UPDATED",
@@ -127,12 +129,12 @@ public class UserService {
     }
     
     @Transactional
-    public void resetUserPassword(UUID userId, String newPassword, HttpServletRequest httpRequest) {
-        User user = userRepository.findById(userId)
+    public void resetUserPassword(@NonNull UUID userId, String newPassword, HttpServletRequest httpRequest) {
+        User user = userRepository.findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         
         user.setPasswordHash(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
+        userRepository.save(Objects.requireNonNull(user));
         
         auditService.logAction(
             "PASSWORD_RESET",
@@ -142,12 +144,12 @@ public class UserService {
     }
     
     @Transactional
-    public void updateUserStatus(UUID userId, Boolean active, HttpServletRequest httpRequest) {
-        User user = userRepository.findById(userId)
+    public void updateUserStatus(@NonNull UUID userId, Boolean active, HttpServletRequest httpRequest) {
+        User user = userRepository.findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         
         user.setActive(active);
-        userRepository.save(user);
+        userRepository.save(Objects.requireNonNull(user));
         
         auditService.logAction(
             "USER_STATUS_UPDATED",
@@ -157,13 +159,13 @@ public class UserService {
     }
     
     @Transactional
-    public void deleteUser(UUID userId, HttpServletRequest httpRequest) {
-        User user = userRepository.findById(userId)
+    public void deleteUser(@NonNull UUID userId, HttpServletRequest httpRequest) {
+        User user = userRepository.findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new RuntimeException("User not found"));
         
         // Soft delete - set active to false
         user.setActive(false);
-        userRepository.save(user);
+        userRepository.save(Objects.requireNonNull(user));
         
         auditService.logWithRequest("DELETE_USER", "User", userId,
             "active=true", "active=false", "User deactivated: " + user.getUsername(), httpRequest);
@@ -177,12 +179,12 @@ public class UserService {
         return roleRepository.count();
     }
     
-    public User createUser(User user) {
-        return userRepository.save(user);
+    public User createUser(@NonNull User user) {
+        return userRepository.save(Objects.requireNonNull(user));
     }
     
-    public Role createRole(Role role) {
-        return roleRepository.save(role);
+    public Role createRole(@NonNull Role role) {
+        return roleRepository.save(Objects.requireNonNull(role));
     }
 
     // Read operations for controllers
@@ -190,7 +192,7 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    public java.util.Optional<User> getUserById(UUID id) {
-        return userRepository.findById(id);
+    public java.util.Optional<User> getUserById(@NonNull UUID id) {
+        return userRepository.findById(Objects.requireNonNull(id));
     }
 }

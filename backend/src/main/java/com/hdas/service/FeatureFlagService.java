@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -89,9 +90,9 @@ public class FeatureFlagService {
     }
     
     public void deleteFeatureFlag(String name) {
-        getFeatureFlag(name)
-                .ifPresent(existing -> {
-                    featureFlagRepository.delete(existing);
+                getFeatureFlag(name)
+                                .ifPresent(existing -> {
+                                        featureFlagRepository.delete(Objects.requireNonNull(existing));
                     log.info("Deleted feature flag: {}", name);
                 });
     }

@@ -1,7 +1,4 @@
 package com.hdas.security;
-
-import com.hdas.domain.user.Role;
-import com.hdas.domain.user.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

@@ -24,17 +24,34 @@ set "MYSQL_SERVICE=MySQL80"
 set "BACKEND_PORT=8080"
 set "FRONTEND_PORT=3001"
 set "START_DELAY=15"
+REM Force opening new windows regardless of existing processes (set ALWAYS_NEW_WINDOWS=1)
+set "ALWAYS_NEW_WINDOWS=%ALWAYS_NEW_WINDOWS%"
 
 REM ---- Check for running processes ----
 echo [Check] Checking for existing services...
 
-REM Check if backend is already running
-netstat -an | findstr ":%BACKEND_PORT%" >nul
-if not errorlevel 1 (
-    echo [Warning] Backend already running on port %BACKEND_PORT%
-    set "SKIP_BACKEND=1"
-) else (
-    set "SKIP_BACKEND=0"
+REM Detect existing backend on 8080-8090 via /actuator/health
+set "BACK_PORT=%BACKEND_PORT%"
+set "SKIP_BACKEND=0"
+for /l %%P in (8080,1,8090) do (
+    powershell -NoProfile -Command "try { iwr http://localhost:%%P/actuator/health -UseBasicParsing -TimeoutSec 1 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
+    if not errorlevel 1 (
+        set "BACK_PORT=%%P"
+        set "SKIP_BACKEND=1"
+        goto BACKEND_DETECTED
+    )
+)
+:BACKEND_DETECTED
+
+REM If backend not running, find a free port starting from BACKEND_PORT
+if "%SKIP_BACKEND%"=="0" (
+    :CHECK_BACKEND_PORT
+    netstat -an | findstr ":%BACK_PORT%" >nul
+    if not errorlevel 1 (
+        echo [Info] Port %BACK_PORT% is busy, trying next...
+        set /a BACK_PORT+=1
+        goto CHECK_BACKEND_PORT
+    )
 )
 
 REM Check if frontend is already running
@@ -44,6 +61,15 @@ if not errorlevel 1 (
     set "SKIP_FRONTEND=1"
 ) else (
     set "SKIP_FRONTEND=0"
+)
+
+REM Override: always open new windows even if ports are busy
+if defined ALWAYS_NEW_WINDOWS (
+    if "%ALWAYS_NEW_WINDOWS%"=="1" (
+        echo [Override] ALWAYS_NEW_WINDOWS=1 → forcing new windows for backend and frontend.
+        set "SKIP_BACKEND=0"
+        set "SKIP_FRONTEND=0"
+    )
 )
 
 REM ---- MySQL Service ----
@@ -119,16 +145,16 @@ echo =============================================================
 
 REM Start Backend
 if "%SKIP_BACKEND%"=="0" (
-    echo [Backend] Starting Spring Boot application...
-    start "HDAS Backend - Port %BACKEND_PORT%" cmd /k "cd /d \"%~dp0backend\" && echo Starting backend... && mvn spring-boot:run -Dspring-boot.run.profiles=dev"
+    echo [Backend] Starting Spring Boot application in a new system window...
+    start "HDAS Backend - Port %BACK_PORT%" "%ComSpec%" /k "cd /d \"%~dp0backend\" && echo Starting backend... && mvn spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--server.port=%BACK_PORT%"
     
     echo [Backend] Waiting %START_DELAY% seconds for backend to initialize...
     timeout /t %START_DELAY% /nobreak >nul
     
     REM Check if backend started successfully
-    netstat -an | findstr ":%BACKEND_PORT%" >nul
+    netstat -an | findstr ":%BACK_PORT%" >nul
     if not errorlevel 1 (
-        echo [Backend] Backend started successfully on port %BACKEND_PORT%.
+        echo [Backend] Backend started successfully on port %BACK_PORT%.
     ) else (
         echo [Warning] Backend may not have started properly. Check the backend window.
     )
@@ -138,16 +164,25 @@ if "%SKIP_BACKEND%"=="0" (
 
 REM Start Frontend
 if "%SKIP_FRONTEND%"=="0" (
-    echo [Frontend] Starting Next.js development server...
-    start "HDAS Frontend - Port %FRONTEND_PORT%" cmd /k "cd /d \"%~dp0frontend\" && echo Starting frontend... && npm run dev"
+    REM Determine available port, starting from FRONTEND_PORT
+    set "FRONT_PORT=%FRONTEND_PORT%"
+    :CHECK_FRONT_PORT
+    netstat -an | findstr ":%FRONT_PORT%" >nul
+    if not errorlevel 1 (
+        set /a FRONT_PORT+=1
+        goto CHECK_FRONT_PORT
+    )
+    echo [Frontend] Starting Next.js development server on port %FRONT_PORT%...
+    echo NEXT_PUBLIC_API_URL=http://localhost:%BACK_PORT%> "%~dp0frontend\.env.local"
+    start "HDAS Frontend - Port %FRONT_PORT%" "%ComSpec%" /k "cd /d \"%~dp0frontend\" && echo Starting frontend... && set NEXT_PUBLIC_API_URL=http://localhost:%BACK_PORT% && npm run dev -- -p %FRONT_PORT%"
     
     REM Wait a bit for frontend to start
     timeout /t 5 /nobreak >nul
     
     REM Check if frontend started successfully
-    netstat -an | findstr ":%FRONTEND_PORT%" >nul
+    netstat -an | findstr ":%FRONT_PORT%" >nul
     if not errorlevel 1 (
-        echo [Frontend] Frontend started successfully on port %FRONTEND_PORT%.
+        echo [Frontend] Frontend started successfully on port %FRONT_PORT%.
     ) else (
         echo [Warning] Frontend may not have started properly. Check the frontend window.
     )
@@ -164,12 +199,12 @@ echo.
 echo Service Status:
 echo ----------------
 if "%SKIP_BACKEND%"=="0" (
-    echo Backend:  http://localhost:%BACKEND_PORT% ^(Starting^)
+    echo Backend:  http://localhost:%BACK_PORT% ^(Starting^)
 ) else (
-    echo Backend:  http://localhost:%BACKEND_PORT% ^(Already Running^)
+    echo Backend:  http://localhost:%BACK_PORT% ^(Already Running^)
 )
 if "%SKIP_FRONTEND%"=="0" (
-    echo Frontend: http://localhost:%FRONTEND_PORT% ^(Starting^)
+    echo Frontend: http://localhost:%FRONT_PORT% ^(Starting^)
 ) else (
     echo Frontend: http://localhost:%FRONTEND_PORT% ^(Already Running^)
 )
@@ -177,8 +212,8 @@ echo MySQL:    Service %MYSQL_SERVICE%
 echo.
 echo Application URLs:
 echo - Backend API:     http://localhost:%BACKEND_PORT%
-echo - Frontend App:    http://localhost:%FRONTEND_PORT%
-echo - Health Check:    http://localhost:%BACKEND_PORT%/actuator/health
+echo - Frontend App:    http://localhost:%FRONT_PORT%
+echo - Health Check:    http://localhost:%BACK_PORT%/actuator/health
 echo.
 echo Windows opened for each service. Check them for detailed logs.
 echo.

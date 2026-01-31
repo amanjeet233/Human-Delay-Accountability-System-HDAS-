@@ -6,12 +6,12 @@ import com.hdas.dto.CreateSLAExclusionRuleRequest;
 import com.hdas.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +30,7 @@ public class GovernanceService {
             throw new RuntimeException("Feature disabled: governanceAnalysis");
         }
         ProcessStep step = request.getProcessStepId() != null ?
-            processStepRepository.findById(request.getProcessStepId()).orElse(null) : null;
+            processStepRepository.findById(Objects.requireNonNull(request.getProcessStepId())).orElse(null) : null;
         
         SLAExclusionRule rule = SLAExclusionRule.builder()
             .processStep(step)
@@ -41,7 +41,7 @@ public class GovernanceService {
             .active(true)
             .build();
         
-        rule = exclusionRuleRepository.save(rule);
+        rule = exclusionRuleRepository.save(Objects.requireNonNull(rule));
         
         auditService.logWithRequest("CREATE_SLA_EXCLUSION", "SLAExclusionRule", rule.getId(),
             null, request.getRuleType(), "SLA exclusion rule created", httpRequest);
@@ -49,12 +49,12 @@ public class GovernanceService {
         return rule;
     }
     
-    public Map<String, Object> identifyBottlenecks(UUID processId) {
+    public Map<String, Object> identifyBottlenecks(@NonNull UUID processId) {
         if (!featureFlagService.isFeatureEnabled("governanceAnalysis")) {
             return Collections.emptyMap();
         }
         
-        List<com.hdas.domain.process.ProcessStep> steps = processStepRepository.findByProcessIdOrderBySequenceOrderAsc(processId);
+        List<com.hdas.domain.process.ProcessStep> steps = processStepRepository.findByProcessIdOrderBySequenceOrderAsc(Objects.requireNonNull(processId));
         Map<String, Object> bottlenecks = new HashMap<>();
         Map<String, Long> stepDelays = new HashMap<>();
         Map<String, Integer> stepCounts = new HashMap<>();
@@ -93,7 +93,7 @@ public class GovernanceService {
         return bottlenecks;
     }
     
-    public Map<String, Object> simulateDelayImpact(UUID processId, long additionalDelaySeconds) {
+    public Map<String, Object> simulateDelayImpact(@NonNull UUID processId, long additionalDelaySeconds) {
         if (!featureFlagService.isFeatureEnabled("governanceAnalysis")) {
             return Collections.emptyMap();
         }
@@ -101,7 +101,7 @@ public class GovernanceService {
         Map<String, Object> simulation = new HashMap<>();
         
         // Rule-based simulation: calculate impact on SLA compliance
-        List<com.hdas.domain.process.ProcessStep> steps = processStepRepository.findByProcessIdOrderBySequenceOrderAsc(processId);
+        List<com.hdas.domain.process.ProcessStep> steps = processStepRepository.findByProcessIdOrderBySequenceOrderAsc(Objects.requireNonNull(processId));
         int totalSteps = steps.size();
         long averageSlaDuration = (long) steps.stream()
             .filter(s -> s.getDefaultSlaDurationSeconds() != null)
@@ -121,7 +121,7 @@ public class GovernanceService {
     
     public List<SLAExclusionRule> getExclusionRules(UUID processStepId) {
         if (processStepId != null) {
-            return exclusionRuleRepository.findByProcessStepId(processStepId);
+            return exclusionRuleRepository.findByProcessStepId(Objects.requireNonNull(processStepId));
         }
         return exclusionRuleRepository.findByActiveTrue();
     }

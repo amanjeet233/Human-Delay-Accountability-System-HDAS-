@@ -34,49 +34,62 @@ public class DatabaseInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        log.info("Initializing HDAS database with empty state");
-        
-        // Initialize default roles if no roles exist
+        log.info("Initializing HDAS database (seed gated by environment)");
+
+        // Roles are part of baseline schema. Ensure presence without seeding users.
         initializeDefaultRoles();
-        
-        // Initialize default admin user if no users exist
-        initializeAdminUser();
-        
-        // Initialize sample users for testing
-        initializeSampleUsers();
-        
+
+        // Conditionally seed users only when explicitly enabled
+        boolean seedEnabled = Boolean.parseBoolean(environment.getProperty("HDAS_SEED_ENABLED", "false"));
+        boolean isDevProfile = isDevProfile();
+
+        if (seedEnabled) {
+            // Initialize default admin user if no users exist and admin password provided
+            initializeAdminUser();
+
+            // Initialize sample users only in dev profile
+            if (isDevProfile) {
+                initializeSampleUsers();
+            } else {
+                log.info("Skipping sample user creation outside dev profile");
+            }
+        } else {
+            log.info("User seeding disabled (HDAS_SEED_ENABLED=false). Skipping admin/sample users.");
+        }
+
         // Initialize feature flags with all features disabled
         initializeFeatureFlags();
-        
+
         log.info("Database initialization completed");
     }
     
     private void initializeAdminUser() {
-        // Skip creating DB admin user when running in 'simple' profile (hardcoded admin available)
-        boolean isSimpleProfile = java.util.Arrays.asList(environment.getActiveProfiles()).contains("simple");
-        if (isSimpleProfile) {
-            log.info("Simple profile active: skipping default admin DB user (hardcoded admin handled in AuthService)");
-            return;
-        }
-        // Check if admin user already exists
+        // Create admin user ONLY when seeded and password provided via environment
         if (userService.getUserCount() == 0) {
+            String adminPassword = environment.getProperty("HDAS_ADMIN_PASSWORD");
+            if (adminPassword == null || adminPassword.isBlank()) {
+                log.warn("HDAS_ADMIN_PASSWORD not set. Skipping admin user creation to avoid hardcoded credentials.");
+                return;
+            }
+
             Role adminRole = roleRepository.findByName("ADMIN")
                     .orElseThrow(() -> new IllegalStateException("Default ADMIN role is missing during initialization"));
             User adminUser = User.builder()
                     .username("admin")
                     .email("admin@hdas.local")
-                    .passwordHash(passwordEncoder.encode("admin123")) // Default password - should be changed on first login
+                    .passwordHash(passwordEncoder.encode(adminPassword))
                     .firstName("System")
                     .lastName("Administrator")
                     .department("IT")
                     .active(true)
                     .roles(new java.util.HashSet<>(Set.of(adminRole)))
                     .build();
-            
+
             userService.createUser(adminUser);
-            log.info("Created default admin user: admin");
+            log.info("Created default admin user with environment-supplied password.");
         } else {
             log.info("Admin user already exists, skipping creation");
+            // Ensure existing admin user has ADMIN role
             roleRepository.findByName("ADMIN").ifPresent(adminRole ->
                     userRepository.findByUsername("admin").ifPresent(existingAdmin -> {
                         if (existingAdmin.getRoles() == null || existingAdmin.getRoles().stream().noneMatch(r -> "ADMIN".equals(r.getName()))) {
@@ -147,7 +160,7 @@ public class DatabaseInitializer implements CommandLineRunner {
     }
     
     private void initializeSampleUsers() {
-        // Only create sample users if database is empty (except admin)
+        // Only create sample users in dev profile when database is empty (except admin)
         if (userService.getUserCount() <= 1) {
             Role citizenRole = roleRepository.findByName("CITIZEN")
                 .orElseThrow(() -> new IllegalStateException("CITIZEN role is missing during initialization"));
@@ -237,7 +250,7 @@ public class DatabaseInitializer implements CommandLineRunner {
                 userService.createUser(user);
             }
             
-            log.info("Created {} sample users for testing", sampleUsers.size());
+            log.info("Created {} sample users for testing (dev profile)", sampleUsers.size());
         } else {
             log.info("Users already exist, skipping sample user creation");
         }
@@ -247,5 +260,14 @@ public class DatabaseInitializer implements CommandLineRunner {
         // Initialize feature flags with all features disabled by default
         featureFlagService.initializeDefaultFeatureFlags();
         log.info("Initialized default feature flags with all features disabled");
+    }
+
+    private boolean isDevProfile() {
+        for (String profile : environment.getActiveProfiles()) {
+            if ("dev".equalsIgnoreCase(profile)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

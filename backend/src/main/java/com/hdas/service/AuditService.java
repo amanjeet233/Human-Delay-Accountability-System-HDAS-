@@ -6,6 +6,7 @@ import com.hdas.security.RoleBasedAccessControl;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -23,33 +25,33 @@ public class AuditService {
     
     private final AuditLogRepository auditLogRepository;
     
-    public AuditLog createAuditLog(AuditLog auditLog) {
-        AuditLog saved = auditLogRepository.save(auditLog);
+    public AuditLog createAuditLog(@NonNull AuditLog auditLog) {
+        AuditLog saved = auditLogRepository.save(Objects.requireNonNull(auditLog));
         log.info("Created audit log: {} by {}", saved.getAction(), saved.getUsername());
         return saved;
     }
     
-    public Page<AuditLog> getAllAuditLogs(Pageable pageable) {
+    public Page<AuditLog> getAllAuditLogs(@NonNull Pageable pageable) {
         return auditLogRepository.findAll(pageable);
     }
     
-    public Page<AuditLog> getAuditLogsByUser(String username, Pageable pageable) {
+    public Page<AuditLog> getAuditLogsByUser(String username, @NonNull Pageable pageable) {
         return auditLogRepository.findByUsername(username, pageable);
     }
     
-    public Page<AuditLog> getAuditLogsByCategory(String category, Pageable pageable) {
+    public Page<AuditLog> getAuditLogsByCategory(String category, @NonNull Pageable pageable) {
         return auditLogRepository.findByCategory(category, pageable);
     }
     
-    public Page<AuditLog> getAuditLogsBySeverity(String severity, Pageable pageable) {
+    public Page<AuditLog> getAuditLogsBySeverity(String severity, @NonNull Pageable pageable) {
         return auditLogRepository.findBySeverity(severity, pageable);
     }
     
-    public Page<AuditLog> getAuditLogsByDateRange(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
+    public Page<AuditLog> getAuditLogsByDateRange(LocalDateTime startDate, LocalDateTime endDate, @NonNull Pageable pageable) {
         return auditLogRepository.findByTimestampBetween(startDate, endDate, pageable);
     }
     
-    public Page<AuditLog> getAuditLogsByLegalHold(Boolean legalHold, Pageable pageable) {
+    public Page<AuditLog> getAuditLogsByLegalHold(Boolean legalHold, @NonNull Pageable pageable) {
         return auditLogRepository.findByLegalHold(legalHold, pageable);
     }
     
@@ -57,30 +59,30 @@ public class AuditService {
         return auditLogRepository.findByEntityTypeAndEntityId(entityType, entityId);
     }
     
-    public AuditLog placeLegalHold(Long auditLogId, String reason, String placedBy) {
-        return auditLogRepository.findById(auditLogId)
+    public AuditLog placeLegalHold(@NonNull Long auditLogId, String reason, String placedBy) {
+        return auditLogRepository.findById(Objects.requireNonNull(auditLogId))
                 .map(auditLog -> {
                     auditLog.setLegalHold(true);
                     auditLog.setLegalHoldReason(reason);
                     auditLog.setLegalHoldBy(placedBy);
                     auditLog.setLegalHoldAt(LocalDateTime.now());
                     
-                    AuditLog saved = auditLogRepository.save(auditLog);
+                    AuditLog saved = auditLogRepository.save(Objects.requireNonNull(auditLog));
                     log.info("Placed legal hold on audit log {} by {}", auditLogId, placedBy);
                     return saved;
                 })
                 .orElseThrow(() -> new RuntimeException("Audit log not found: " + auditLogId));
     }
     
-    public AuditLog releaseLegalHold(Long auditLogId, String releasedBy) {
-        return auditLogRepository.findById(auditLogId)
+    public AuditLog releaseLegalHold(@NonNull Long auditLogId, String releasedBy) {
+        return auditLogRepository.findById(Objects.requireNonNull(auditLogId))
                 .map(auditLog -> {
                     auditLog.setLegalHold(false);
                     auditLog.setLegalHoldReason(null);
                     auditLog.setLegalHoldBy(null);
                     auditLog.setLegalHoldAt(null);
                     
-                    AuditLog saved = auditLogRepository.save(auditLog);
+                    AuditLog saved = auditLogRepository.save(Objects.requireNonNull(auditLog));
                     log.info("Released legal hold on audit log {} by {}", auditLogId, releasedBy);
                     return saved;
                 })
@@ -245,8 +247,8 @@ public class AuditService {
         );
     }
     
-    public AuditLog getAuditLog(Long id) {
-        return auditLogRepository.findById(id)
+    public AuditLog getAuditLog(@NonNull Long id) {
+        return auditLogRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new RuntimeException("Audit log not found: " + id));
     }
 }

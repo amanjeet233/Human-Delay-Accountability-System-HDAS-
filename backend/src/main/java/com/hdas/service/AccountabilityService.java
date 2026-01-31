@@ -4,16 +4,17 @@ import com.hdas.domain.accountability.Delegation;
 import com.hdas.domain.accountability.DelayDebtScore;
 import com.hdas.domain.assignment.Assignment;
 import com.hdas.domain.delay.Delay;
-import com.hdas.domain.user.Role;
 import com.hdas.domain.user.User;
 import com.hdas.dto.CreateDelegationRequest;
 import com.hdas.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,13 +33,13 @@ public class AccountabilityService {
     
     @Transactional
     public Delegation createDelegation(CreateDelegationRequest request, HttpServletRequest httpRequest) {
-        Assignment assignment = assignmentRepository.findById(request.getAssignmentId())
+        Assignment assignment = assignmentRepository.findById(Objects.requireNonNull(request.getAssignmentId()))
             .orElseThrow(() -> new RuntimeException("Assignment not found"));
         
-        User originalUser = userRepository.findById(request.getOriginalUserId())
+        User originalUser = userRepository.findById(Objects.requireNonNull(request.getOriginalUserId()))
             .orElseThrow(() -> new RuntimeException("Original user not found"));
         
-        User delegatedTo = userRepository.findById(request.getDelegatedToId())
+        User delegatedTo = userRepository.findById(Objects.requireNonNull(request.getDelegatedToId()))
             .orElseThrow(() -> new RuntimeException("Delegated user not found"));
         
         Delegation delegation = Delegation.builder()
@@ -50,7 +51,7 @@ public class AccountabilityService {
             .active(true)
             .build();
         
-        delegation = delegationRepository.save(delegation);
+        delegation = delegationRepository.save(Objects.requireNonNull(delegation));
         
         auditService.logWithRequest("CREATE_DELEGATION", "Delegation", delegation.getId(),
             null, "Delegated to: " + delegatedTo.getUsername(), "Delegation created", httpRequest);
@@ -59,12 +60,12 @@ public class AccountabilityService {
     }
     
     @Transactional
-    public void calculateDelayDebt(UUID userId, UUID roleId) {
+    public void calculateDelayDebt(@NonNull UUID userId, UUID roleId) {
         if (!featureFlagService.isFeatureEnabled("advancedAccountability")) {
             return;
         }
         
-        List<Delay> delays = delayRepository.findByResponsibleUserId(userId);
+        List<Delay> delays = delayRepository.findByResponsibleUserId(Objects.requireNonNull(userId));
         
         long totalDelaySeconds = 0;
         int count = 0;
@@ -78,10 +79,10 @@ public class AccountabilityService {
         
         long averageDelaySeconds = count > 0 ? totalDelaySeconds / count : 0;
         
-        DelayDebtScore score = delayDebtScoreRepository.findByUserIdAndRoleId(userId, roleId)
+        DelayDebtScore score = delayDebtScoreRepository.findByUserIdAndRoleId(Objects.requireNonNull(userId), roleId)
             .orElse(DelayDebtScore.builder()
-                .user(userRepository.findById(userId).orElseThrow())
-                .role(roleId != null ? roleRepository.findById(roleId).orElse(null) : null)
+            .user(userRepository.findById(Objects.requireNonNull(userId)).orElseThrow())
+            .role(roleId != null ? roleRepository.findById(Objects.requireNonNull(roleId)).orElse(null) : null)
                 .build());
         
         score.setTotalDelaySeconds(totalDelaySeconds);
@@ -89,11 +90,11 @@ public class AccountabilityService {
         score.setAverageDelaySeconds(averageDelaySeconds);
         score.setLastCalculatedAt(Instant.now());
         
-        delayDebtScoreRepository.save(score);
+        delayDebtScoreRepository.save(Objects.requireNonNull(score));
     }
     
     @Transactional
-    public Delay createShadowDelay(Assignment assignment, long delaySeconds, String reason, HttpServletRequest httpRequest) {
+    public Delay createShadowDelay(@NonNull Assignment assignment, long delaySeconds, String reason, HttpServletRequest httpRequest) {
         if (!featureFlagService.isFeatureEnabled("advancedAccountability")) {
             return null;
         }
@@ -108,7 +109,7 @@ public class AccountabilityService {
             .isShadowDelay(true)
             .build();
         
-        delay = delayRepository.save(delay);
+        delay = delayRepository.save(Objects.requireNonNull(delay));
         
         auditService.logWithRequest("CREATE_SHADOW_DELAY", "Delay", delay.getId(),
             null, String.valueOf(delaySeconds), "Shadow delay created: " + reason, httpRequest);
@@ -116,12 +117,12 @@ public class AccountabilityService {
         return delay;
     }
     
-    public List<Delegation> getDelegationsByAssignment(UUID assignmentId) {
-        return delegationRepository.findByAssignmentId(assignmentId);
+    public List<Delegation> getDelegationsByAssignment(@NonNull UUID assignmentId) {
+        return delegationRepository.findByAssignmentId(Objects.requireNonNull(assignmentId));
     }
     
-    public DelayDebtScore getDelayDebtScore(UUID userId, UUID roleId) {
-        return delayDebtScoreRepository.findByUserIdAndRoleId(userId, roleId)
+    public DelayDebtScore getDelayDebtScore(@NonNull UUID userId, UUID roleId) {
+        return delayDebtScoreRepository.findByUserIdAndRoleId(Objects.requireNonNull(userId), roleId)
             .orElse(null);
     }
 }

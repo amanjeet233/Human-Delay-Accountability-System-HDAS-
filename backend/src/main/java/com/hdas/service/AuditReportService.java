@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -54,7 +55,7 @@ public class AuditReportService {
         writer.flush();
         writer.close();
         
-        return new ByteArrayResource(outputStream.toByteArray());
+        return new ByteArrayResource(Objects.requireNonNull(outputStream.toByteArray()));
     }
     
     public Resource generatePDFReport(Instant startDate, Instant endDate) throws IOException {
@@ -89,6 +90,6 @@ public class AuditReportService {
         writer.flush();
         writer.close();
         
-        return new ByteArrayResource(outputStream.toByteArray());
+        return new ByteArrayResource(Objects.requireNonNull(outputStream.toByteArray()));
     }
 }

@@ -2,16 +2,17 @@ package com.hdas.controller;
 
 import com.hdas.domain.sla.SLA;
 import com.hdas.dto.CreateSLARequest;
-import com.hdas.service.AuditService;
 import com.hdas.service.SLAService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -29,8 +30,8 @@ public class SLAController {
     
     @GetMapping("/step/{stepId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<SLA>> getSLAsByStep(@PathVariable UUID stepId) {
-        return ResponseEntity.ok(slaService.getSLAsByProcessStep(stepId));
+    public ResponseEntity<List<SLA>> getSLAsByStep(@PathVariable @NonNull UUID stepId) {
+        return ResponseEntity.ok(slaService.getSLAsByProcessStep(Objects.requireNonNull(stepId)));
     }
     
     @PostMapping
@@ -42,8 +43,8 @@ public class SLAController {
     
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<SLA> updateSLA(@PathVariable UUID id, @Valid @RequestBody CreateSLARequest request, HttpServletRequest httpRequest) {
-        SLA sla = slaService.updateSLA(id, request, httpRequest);
+    public ResponseEntity<SLA> updateSLA(@PathVariable @NonNull UUID id, @Valid @RequestBody CreateSLARequest request, HttpServletRequest httpRequest) {
+        SLA sla = slaService.updateSLA(Objects.requireNonNull(id), request, httpRequest);
         return ResponseEntity.ok(sla);
     }
 }

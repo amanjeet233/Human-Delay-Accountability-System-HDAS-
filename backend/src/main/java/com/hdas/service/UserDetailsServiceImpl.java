@@ -3,6 +3,7 @@ package com.hdas.service;
 import com.hdas.domain.user.User;
 import com.hdas.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,8 +16,26 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * UserDetailsService implementation for HDAS
+ * 
+ * Critical: ROLE_ Prefix Handling
+ * - Database stores roles WITHOUT prefix (e.g., "ADMIN", "CLERK", "CITIZEN")
+ * - This service ADDS "ROLE_" prefix during authentication (line 53)
+ * - Spring Security requires ROLE_ prefix for hasRole() checks
+ * - Security config uses hasRole("ADMIN") which internally checks for "ROLE_ADMIN"
+ * 
+ * Authentication Flow:
+ * 1. User logs in with username/password
+ * 2. DaoAuthenticationProvider calls loadUserByUsername()
+ * 3. We fetch user from database and build authorities
+ * 4. Roles converted: "ADMIN" -> "ROLE_ADMIN", "CLERK" -> "ROLE_CLERK"
+ * 5. UserDetails returned with BCrypt password hash for verification
+ * 6. Password verified, session created with authorities
+ */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserDetailsServiceImpl implements UserDetailsService {
     
     private final UserRepository userRepository;
@@ -24,17 +43,23 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        log.debug("Loading user by username: {}", username);
+        
         User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
         
         if (!user.getActive()) {
-            throw new UsernameNotFoundException("User is inactive: " + username);
+            log.warn("Inactive user attempted login: {}", username);
+            throw new UsernameNotFoundException("User account is disabled: " + username);
         }
+        
+        Collection<? extends GrantedAuthority> authorities = getAuthorities(user);
+        log.debug("User {} loaded with {} authorities", username, authorities.size());
         
         return org.springframework.security.core.userdetails.User.builder()
             .username(user.getUsername())
-            .password(user.getPasswordHash())
-            .authorities(getAuthorities(user))
+            .password(user.getPasswordHash()) // BCrypt hash from database
+            .authorities(authorities)
             .accountExpired(false)
             .accountLocked(false)
             .credentialsExpired(false)
@@ -42,15 +67,24 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             .build();
     }
     
+    /**
+     * Builds authorities from user's roles and permissions
+     * CRITICAL: Adds ROLE_ prefix to role names
+     */
     private Collection<? extends GrantedAuthority> getAuthorities(User user) {
         Set<SimpleGrantedAuthority> authorities = new java.util.HashSet<>();
         
-        // Add role authorities
+        // Add role-based authorities with ROLE_ prefix
+        // Database has "ADMIN" -> We create "ROLE_ADMIN"
         user.getRoles().stream()
             .filter(role -> role.getActive())
-            .forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName())));
+            .forEach(role -> {
+                String authority = "ROLE_" + role.getName();
+                authorities.add(new SimpleGrantedAuthority(authority));
+                log.trace("Added authority: {}", authority);
+            });
         
-        // Add permission authorities
+        // Collect role names and permissions for derived authorities
         Set<String> roleNames = user.getRoles().stream()
             .filter(role -> role.getActive())
             .map(role -> role.getName())
@@ -61,18 +95,26 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             .flatMap(role -> role.getPermissions().stream())
             .collect(Collectors.toSet());
 
+        // Add permission-based authorities (no ROLE_ prefix for permissions)
         permissions.forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
 
+        // Add derived CRUD authorities based on permissions
         addDerivedAuthorities(authorities, roleNames, permissions);
         
         return authorities;
     }
 
-    private void addDerivedAuthorities(Set<SimpleGrantedAuthority> authorities, Set<String> roleNames, Set<String> permissions) {
+    /**
+     * Adds derived CRUD authorities based on role permissions
+     * Used for fine-grained access control
+     */
+    private void addDerivedAuthorities(Set<SimpleGrantedAuthority> authorities, 
+                                      Set<String> roleNames, 
+                                      Set<String> permissions) {
         boolean hasAllPermissions = permissions.contains("ALL_PERMISSIONS");
         boolean isAdminRole = roleNames.contains("ADMIN");
 
-        boolean elevatedPermission = permissions.stream().anyMatch(p ->
+        boolean hasElevatedPermission = permissions.stream().anyMatch(p ->
             p.startsWith("MANAGE_") ||
             p.startsWith("CONFIGURE_") ||
             p.startsWith("HANDLE_") ||
@@ -81,6 +123,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             p.startsWith("GENERATE_")
         );
 
+        // Admin gets all CRUD authorities
         if (hasAllPermissions || isAdminRole) {
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN_READ"));
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN_CREATE"));
@@ -94,20 +137,25 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             return;
         }
 
-        if (permissions.stream().anyMatch(p -> p.startsWith("READ_")) || elevatedPermission) {
+        // Grant user CRUD authorities based on permission prefixes
+        if (permissions.stream().anyMatch(p -> p.startsWith("READ_")) || hasElevatedPermission) {
             authorities.add(new SimpleGrantedAuthority("ROLE_USER_READ"));
         }
-        if (permissions.stream().anyMatch(p -> p.startsWith("CREATE_")) || elevatedPermission) {
+        if (permissions.stream().anyMatch(p -> p.startsWith("CREATE_")) || hasElevatedPermission) {
             authorities.add(new SimpleGrantedAuthority("ROLE_USER_CREATE"));
         }
-        if (permissions.stream().anyMatch(p -> p.startsWith("UPDATE_") || p.startsWith("APPROVE_") || p.startsWith("HANDLE_") || p.startsWith("MANAGE_") || p.startsWith("CONFIGURE_") || p.startsWith("REVIEW_")) || elevatedPermission) {
+        if (permissions.stream().anyMatch(p -> 
+            p.startsWith("UPDATE_") || p.startsWith("APPROVE_") || 
+            p.startsWith("HANDLE_") || p.startsWith("MANAGE_") || 
+            p.startsWith("CONFIGURE_") || p.startsWith("REVIEW_")) || hasElevatedPermission) {
             authorities.add(new SimpleGrantedAuthority("ROLE_USER_UPDATE"));
         }
         if (permissions.stream().anyMatch(p -> p.startsWith("DELETE_"))) {
             authorities.add(new SimpleGrantedAuthority("ROLE_USER_DELETE"));
         }
 
-        if (elevatedPermission) {
+        // Grant admin CRUD (read-only for elevated permissions)
+        if (hasElevatedPermission) {
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN_READ"));
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN_CREATE"));
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN_UPDATE"));

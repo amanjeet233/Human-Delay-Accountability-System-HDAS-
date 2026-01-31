@@ -8,10 +8,12 @@ import com.hdas.repository.ProcessRepository;
 import com.hdas.repository.ProcessStepRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -38,7 +40,7 @@ public class ProcessService {
             .steps(new ArrayList<>())
             .build();
         
-        process = processRepository.save(process);
+        process = processRepository.save(Objects.requireNonNull(process));
         
         if (request.getSteps() != null) {
             for (CreateProcessStepRequest stepRequest : request.getSteps()) {
@@ -51,7 +53,7 @@ public class ProcessService {
                     .defaultSlaDurationSeconds(stepRequest.getDefaultSlaDurationSeconds())
                     .active(true)
                     .build();
-                processStepRepository.save(step);
+                processStepRepository.save(Objects.requireNonNull(step));
             }
         }
         
@@ -62,8 +64,8 @@ public class ProcessService {
     }
     
     @Transactional
-    public Process updateProcess(UUID id, CreateProcessRequest request, HttpServletRequest httpRequest) {
-        Process process = processRepository.findById(id)
+    public Process updateProcess(@NonNull UUID id, CreateProcessRequest request, HttpServletRequest httpRequest) {
+        Process process = processRepository.findById(Objects.requireNonNull(id))
             .orElseThrow(() -> new RuntimeException("Process not found"));
         
         String oldValue = process.getName() + "|" + process.getVersion();
@@ -75,7 +77,7 @@ public class ProcessService {
             process.setName(request.getName());
         }
         
-        process = processRepository.save(process);
+        process = processRepository.save(Objects.requireNonNull(process));
         
         String newValue = process.getName() + "|" + process.getVersion();
         auditService.logWithRequest("UPDATE_PROCESS", "Process", id,
@@ -85,8 +87,8 @@ public class ProcessService {
     }
     
     @Transactional
-    public ProcessStep addStep(UUID processId, CreateProcessStepRequest request, HttpServletRequest httpRequest) {
-        Process process = processRepository.findById(processId)
+    public ProcessStep addStep(@NonNull UUID processId, CreateProcessStepRequest request, HttpServletRequest httpRequest) {
+        Process process = processRepository.findById(Objects.requireNonNull(processId))
             .orElseThrow(() -> new RuntimeException("Process not found"));
         
         ProcessStep step = ProcessStep.builder()
@@ -99,7 +101,7 @@ public class ProcessService {
             .active(true)
             .build();
         
-        step = processStepRepository.save(step);
+        step = processStepRepository.save(Objects.requireNonNull(step));
         
         auditService.logWithRequest("CREATE_PROCESS_STEP", "ProcessStep", step.getId(),
             null, step.getName(), "Process step created: " + step.getName(), httpRequest);
@@ -112,7 +114,7 @@ public class ProcessService {
         return processRepository.findByActiveTrue();
     }
 
-    public java.util.Optional<Process> getProcessById(UUID id) {
-        return processRepository.findById(id);
+    public java.util.Optional<Process> getProcessById(@NonNull UUID id) {
+        return processRepository.findById(Objects.requireNonNull(id));
     }
 }

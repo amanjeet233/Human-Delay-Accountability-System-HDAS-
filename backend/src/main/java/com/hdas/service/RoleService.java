@@ -6,10 +6,12 @@ import com.hdas.dto.UpdateRoleRequest;
 import com.hdas.repository.RoleRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -32,7 +34,7 @@ public class RoleService {
             .active(request.getActive() != null ? request.getActive() : true)
             .build();
         
-        role = roleRepository.save(role);
+        role = roleRepository.save(Objects.requireNonNull(role));
         
         auditService.logWithRequest("CREATE_ROLE", "Role", role.getId(),
             null, role.getName(), "Role created: " + role.getName(), httpRequest);
@@ -41,8 +43,8 @@ public class RoleService {
     }
     
     @Transactional
-    public Role updateRole(UUID id, UpdateRoleRequest request, HttpServletRequest httpRequest) {
-        Role role = roleRepository.findById(id)
+    public Role updateRole(@NonNull UUID id, UpdateRoleRequest request, HttpServletRequest httpRequest) {
+        Role role = roleRepository.findById(Objects.requireNonNull(id))
             .orElseThrow(() -> new RuntimeException("Role not found"));
         
         String oldValue = role.getName() + "|" + role.getActive();
@@ -57,7 +59,7 @@ public class RoleService {
             role.setActive(request.getActive());
         }
         
-        role = roleRepository.save(role);
+        role = roleRepository.save(Objects.requireNonNull(role));
         
         String newValue = role.getName() + "|" + role.getActive();
         auditService.logWithRequest("UPDATE_ROLE", "Role", id,
@@ -71,7 +73,7 @@ public class RoleService {
         return roleRepository.findAll();
     }
 
-    public java.util.Optional<Role> getRoleById(UUID id) {
-        return roleRepository.findById(id);
+    public java.util.Optional<Role> getRoleById(@NonNull UUID id) {
+        return roleRepository.findById(Objects.requireNonNull(id));
     }
 }

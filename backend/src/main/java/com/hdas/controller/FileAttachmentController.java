@@ -1,10 +1,10 @@
 package com.hdas.controller;
 
 import com.hdas.domain.request.FileAttachment;
-import com.hdas.service.AuditService;
 import com.hdas.service.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -20,12 +21,11 @@ import java.util.UUID;
 public class FileAttachmentController {
     
     private final FileStorageService fileStorageService;
-    private final AuditService auditService;
     
     @PostMapping("/{requestId}/attachments")
     @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<FileAttachment> uploadFile(
-            @PathVariable UUID requestId,
+        public ResponseEntity<FileAttachment> uploadFile(
+            @PathVariable @NonNull UUID requestId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "description", required = false) String description,
             HttpServletRequest httpRequest) {
@@ -48,19 +48,19 @@ public class FileAttachmentController {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();
         }
         
-        FileAttachment attachment = fileStorageService.storeFile(requestId, file, description, httpRequest);
+        FileAttachment attachment = fileStorageService.storeFile(Objects.requireNonNull(requestId), file, description, httpRequest);
         return ResponseEntity.ok(attachment);
     }
     
     @GetMapping("/{requestId}/attachments")
     @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<List<FileAttachment>> getAttachments(@PathVariable UUID requestId) {
-        return ResponseEntity.ok(fileStorageService.getAttachmentsByRequestId(requestId));
+    public ResponseEntity<List<FileAttachment>> getAttachments(@PathVariable @NonNull UUID requestId) {
+        return ResponseEntity.ok(fileStorageService.getAttachmentsByRequestId(Objects.requireNonNull(requestId)));
     }
     
     @GetMapping("/attachments/{id}/download")
     @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<org.springframework.core.io.Resource> downloadFile(@PathVariable UUID id) {
-        return fileStorageService.downloadFile(id);
+    public ResponseEntity<org.springframework.core.io.Resource> downloadFile(@PathVariable @NonNull UUID id) {
+        return fileStorageService.downloadFile(Objects.requireNonNull(id));
     }
 }

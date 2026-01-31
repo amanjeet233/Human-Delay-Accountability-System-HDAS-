@@ -325,6 +325,11 @@ SET @sql := IF(@exists = 0, 'ALTER TABLE users ADD COLUMN version_num BIGINT NUL
 SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'updated_at');
 SET @sql := IF(@exists = 0, 'ALTER TABLE users ADD COLUMN updated_at TIMESTAMP NULL', NULL); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- Full Name generated column for convenience (idempotent)
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'full_name');
+SET @sql := IF(@exists = 0, 'ALTER TABLE users ADD COLUMN full_name VARCHAR(255) GENERATED ALWAYS AS (CONCAT_WS(" ", first_name, last_name)) STORED', NULL);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Roles table columns
 SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'roles' AND column_name = 'version_num');
 SET @sql := IF(@exists = 0, 'ALTER TABLE roles ADD COLUMN version_num BIGINT NULL', NULL); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
@@ -599,6 +604,21 @@ WHERE u.username = 'admin'
 AND NOT EXISTS (
   SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role_id = r.id
 );
+
+-- Default CITIZEN role assignment on new user registration (idempotent trigger)
+DROP TRIGGER IF EXISTS trg_users_assign_citizen;
+DELIMITER $$
+CREATE TRIGGER trg_users_assign_citizen
+AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+  DECLARE citizen_id BINARY(16);
+  SELECT id INTO citizen_id FROM roles WHERE name = 'CITIZEN' LIMIT 1;
+  IF citizen_id IS NOT NULL THEN
+    INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (NEW.id, citizen_id);
+  END IF;
+END$$
+DELIMITER ;
 
 -- Feature Flags (BIGINT id, no UUID)
 INSERT INTO feature_flags (name, description, enabled, impact, category, created_at, updated_at)

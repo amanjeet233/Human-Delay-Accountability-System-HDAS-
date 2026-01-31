@@ -53,6 +53,11 @@ public class User extends BaseEntity {
     @Builder.Default
     private Boolean active = true;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
+    private UserStatus status = UserStatus.ACTIVE;
+    
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_roles",

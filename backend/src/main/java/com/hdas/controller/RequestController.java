@@ -1,22 +1,21 @@
 package com.hdas.controller;
 
 import com.hdas.domain.request.Request;
-import com.hdas.domain.user.User;
 import com.hdas.security.RoleBasedAccessControl;
 import com.hdas.service.AuditService;
 import com.hdas.service.FeatureFlagService;
 import com.hdas.service.RequestService;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -124,7 +123,7 @@ public class RequestController {
         
         try {
             UUID requestId = UUID.fromString(id);
-            Request request = requestService.getRequestById(requestId)
+            Request request = requestService.getRequestById(Objects.requireNonNull(requestId))
                 .orElseThrow(() -> new RuntimeException("Request not found"));
             
             Map<String, Object> response = Map.of(
@@ -182,7 +181,7 @@ public class RequestController {
         
         try {
             UUID requestId = UUID.fromString(id);
-            Request request = requestService.getRequestById(requestId)
+            Request request = requestService.getRequestById(Objects.requireNonNull(requestId))
                 .orElseThrow(() -> new RuntimeException("Request not found"));
             
             Map<String, Object> status = Map.of(
@@ -233,22 +232,22 @@ public class RequestController {
     @PostMapping("/assignments/{assignmentId}/complete")
     @PreAuthorize("hasAnyRole('CLERK','SECTION_OFFICER','HOD')")
     public ResponseEntity<com.hdas.domain.assignment.Assignment> completeAssignment(
-            @PathVariable UUID assignmentId, @RequestBody CompleteAssignmentDto dto, HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(requestService.completeAssignment(assignmentId, dto.getAction(), dto.getNotes(), httpRequest));
+            @PathVariable @NonNull UUID assignmentId, @RequestBody CompleteAssignmentDto dto, HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(requestService.completeAssignment(Objects.requireNonNull(assignmentId), dto.getAction(), dto.getNotes(), httpRequest));
     }
     
     @PostMapping("/assignments/{assignmentId}/start")
     @PreAuthorize("hasAnyRole('CLERK','SECTION_OFFICER','HOD')")
     public ResponseEntity<com.hdas.domain.assignment.Assignment> startAssignment(
-            @PathVariable UUID assignmentId,
+            @PathVariable @NonNull UUID assignmentId,
             HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(requestService.startAssignment(assignmentId, httpRequest));
+        return ResponseEntity.ok(requestService.startAssignment(Objects.requireNonNull(assignmentId), httpRequest));
     }
 
     @GetMapping("/{id}/timeline")
     @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<List<com.hdas.dto.RequestTimelineItem>> getRequestTimeline(@PathVariable UUID id) {
-        return ResponseEntity.ok(requestService.getRequestTimeline(id));
+    public ResponseEntity<List<com.hdas.dto.RequestTimelineItem>> getRequestTimeline(@PathVariable @NonNull UUID id) {
+        return ResponseEntity.ok(requestService.getRequestTimeline(Objects.requireNonNull(id)));
     }
     
     @Data

@@ -36,6 +36,7 @@ logs/
 *.gz
 backend/boot-dev.txt*
 **/logs/
+*.txt
 
 # Environment
 .env

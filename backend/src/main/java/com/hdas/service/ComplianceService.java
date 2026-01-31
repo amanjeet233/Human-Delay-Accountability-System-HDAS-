@@ -10,12 +10,14 @@ import com.hdas.repository.DelayRepository;
 import com.hdas.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -29,11 +31,11 @@ public class ComplianceService {
     private final FeatureFlagService featureFlagService;
     
     @Transactional
-    public DelayJustification createJustification(UUID delayId, CreateJustificationRequest request, HttpServletRequest httpRequest) {
+    public DelayJustification createJustification(@NonNull UUID delayId, CreateJustificationRequest request, HttpServletRequest httpRequest) {
         if (!featureFlagService.isFeatureEnabled("auditCompliance")) {
             throw new RuntimeException("Feature disabled: auditCompliance");
         }
-        Delay delay = delayRepository.findById(delayId)
+        Delay delay = delayRepository.findById(Objects.requireNonNull(delayId))
             .orElseThrow(() -> new RuntimeException("Delay not found"));
         
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -47,7 +49,7 @@ public class ComplianceService {
             .approved(false)
             .build();
         
-        justification = justificationRepository.save(justification);
+        justification = justificationRepository.save(Objects.requireNonNull(justification));
         
         auditService.logWithRequest("CREATE_JUSTIFICATION", "DelayJustification", justification.getId(),
             null, request.getJustificationText(), "Justification created for delay: " + delayId, httpRequest);
@@ -56,11 +58,11 @@ public class ComplianceService {
     }
     
     @Transactional
-    public DelayJustification approveJustification(UUID id, ApproveJustificationRequest request, HttpServletRequest httpRequest) {
+    public DelayJustification approveJustification(@NonNull UUID id, ApproveJustificationRequest request, HttpServletRequest httpRequest) {
         if (!featureFlagService.isFeatureEnabled("auditCompliance")) {
             throw new RuntimeException("Feature disabled: auditCompliance");
         }
-        DelayJustification justification = justificationRepository.findById(id)
+        DelayJustification justification = justificationRepository.findById(Objects.requireNonNull(id))
             .orElseThrow(() -> new RuntimeException("Justification not found"));
         
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -77,7 +79,7 @@ public class ComplianceService {
         justification.getDelay().setJustifiedAt(Instant.now());
         justification.getDelay().setJustification(justification.getJustificationText());
         
-        justification = justificationRepository.save(justification);
+        justification = justificationRepository.save(Objects.requireNonNull(justification));
         
         auditService.logWithRequest("APPROVE_JUSTIFICATION", "DelayJustification", id,
             "approved=false", "approved=true", "Justification approved", httpRequest);

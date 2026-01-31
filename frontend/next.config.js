@@ -1,8 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081',
+  webpack: (config) => {
+    config.infrastructureLogging = { level: 'error' };
+    config.ignoreWarnings = [
+      (warning) =>
+        typeof warning.message === 'string' &&
+        warning.message.includes('PackFileCacheStrategy/webpack.FileSystemInfo') &&
+        warning.message.includes('typescript/lib/typescript')
+    ];
+    return config;
   },
 }
 

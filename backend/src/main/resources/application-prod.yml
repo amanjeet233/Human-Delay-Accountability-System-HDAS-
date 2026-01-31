@@ -26,11 +26,11 @@ server:
   error:
     include-message: never
     include-binding-errors: never
-
-# JWT Configuration - MUST be set via environment variable
-jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  servlet:
+    session:
+      cookie:
+        same-site: lax
+        secure: true
 
 # CORS Configuration
 cors:

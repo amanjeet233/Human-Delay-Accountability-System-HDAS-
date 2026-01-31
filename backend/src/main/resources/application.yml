@@ -44,15 +44,15 @@ server:
   error:
     include-message: always
     include-binding-errors: always
+  servlet:
+    session:
+      cookie:
+        same-site: lax
+        secure: false
 
 # CORS Configuration
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
-
-# JWT Configuration
-jwt:
-  secret: ${JWT_SECRET:hdas-secret-key-for-jwt-token-generation-and-validation-2024}
-  expiration: 86400000 # 24 hours
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3001}
 
 # Feature Flags
 feature:
