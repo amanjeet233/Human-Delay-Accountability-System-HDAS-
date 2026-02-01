@@ -3,6 +3,8 @@ package com.hdas.domain.user;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.hdas.domain.common.BaseEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -52,8 +54,14 @@ public class User extends BaseEntity {
     @Column(name = "active", nullable = false)
     @Builder.Default
     private Boolean active = true;
+
+    @NotNull
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private Boolean mustChangePassword = true;
     
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;

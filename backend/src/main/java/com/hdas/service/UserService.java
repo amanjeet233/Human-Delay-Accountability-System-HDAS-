@@ -27,6 +27,28 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+
+    private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String LOWER = "abcdefghijklmnopqrstuvwxyz";
+    private static final String DIGITS = "0123456789";
+    private static final String SPECIAL = "@#$%&*?!";
+    private static final java.security.SecureRandom RAND = new java.security.SecureRandom();
+
+    public String generateTemporaryPassword() {
+        String all = UPPER + LOWER + DIGITS + SPECIAL;
+        StringBuilder sb = new StringBuilder();
+        // Ensure at least one from each category
+        sb.append(UPPER.charAt(RAND.nextInt(UPPER.length())));
+        sb.append(LOWER.charAt(RAND.nextInt(LOWER.length())));
+        sb.append(DIGITS.charAt(RAND.nextInt(DIGITS.length())));
+        sb.append(SPECIAL.charAt(RAND.nextInt(SPECIAL.length())));
+        // Fill remaining to 12-16 chars
+        int targetLen = 12 + RAND.nextInt(5);
+        for (int i = sb.length(); i < targetLen; i++) {
+            sb.append(all.charAt(RAND.nextInt(all.length())));
+        }
+        return sb.toString();
+    }
     
     @Transactional
     public User createUser(CreateUserRequest request, HttpServletRequest httpRequest) {
@@ -45,14 +67,20 @@ public class UserService {
                 .collect(Collectors.toSet());
         }
         
+        String rawPassword = (request.getPassword() == null || request.getPassword().isBlank())
+            ? generateTemporaryPassword()
+            : request.getPassword();
+
         User user = User.builder()
             .username(request.getUsername())
             .email(request.getEmail())
-            .passwordHash(passwordEncoder.encode(request.getPassword()))
+            .passwordHash(passwordEncoder.encode(rawPassword))
             .firstName(request.getFirstName())
             .lastName(request.getLastName())
             .department(request.getDepartment())
             .active(request.getActive() != null ? request.getActive() : true)
+            .mustChangePassword(true)
+            .status(com.hdas.domain.user.UserStatus.PENDING)
             .roles(new HashSet<>(roles))
             .build();
         
@@ -62,6 +90,21 @@ public class UserService {
             null, user.getUsername(), "User created: " + user.getUsername(), httpRequest);
         
         return user;
+    }
+
+    @Transactional
+    public void completeFirstLoginPasswordChange(@NonNull UUID userId, String newPassword, HttpServletRequest httpRequest) {
+        User user = userRepository.findById(Objects.requireNonNull(userId))
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        user.setStatus(com.hdas.domain.user.UserStatus.ACTIVE);
+        userRepository.save(Objects.requireNonNull(user));
+        auditService.logAction(
+            "FIRST_LOGIN_PASSWORD_CHANGED",
+            "User completed first-login password change: " + user.getUsername(),
+            httpRequest
+        );
     }
     
     @Transactional

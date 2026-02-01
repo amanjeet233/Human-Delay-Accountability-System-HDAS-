@@ -46,13 +46,35 @@ CREATE TABLE IF NOT EXISTS users (
     last_name VARCHAR(100) NOT NULL,
     department VARCHAR(100),
     active BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     version_num BIGINT NOT NULL DEFAULT 0,
     INDEX idx_user_email (email),
     INDEX idx_user_username (username),
+    INDEX idx_user_status (status),
     INDEX idx_user_active (active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ensure 'status' column exists on users table (for dev environments)
+SET @user_status_exists := (
+    SELECT COUNT(*) FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'status'
+);
+SET @user_status_sql := IF(@user_status_exists = 0,
+    'ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT ''ACTIVE'' AFTER active',
+    'SELECT 1');
+PREPARE user_status_stmt FROM @user_status_sql; EXECUTE user_status_stmt; DEALLOCATE PREPARE user_status_stmt;
+
+-- Ensure index on users.status exists
+SET @user_status_idx_exists := (
+    SELECT COUNT(*) FROM information_schema.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND INDEX_NAME = 'idx_user_status'
+);
+SET @user_status_idx_sql := IF(@user_status_idx_exists = 0,
+    'CREATE INDEX idx_user_status ON users(status)',
+    'SELECT 1');
+PREPARE user_status_idx_stmt FROM @user_status_idx_sql; EXECUTE user_status_idx_stmt; DEALLOCATE PREPARE user_status_idx_stmt;
 
 -- Roles Table (Updated for JPA/Hibernate compatibility)
 CREATE TABLE IF NOT EXISTS roles (
@@ -203,6 +225,29 @@ CREATE TABLE IF NOT EXISTS assignments (
     INDEX idx_assignment_step (process_step_id),
     INDEX idx_assignment_status (status),
     INDEX idx_assignment_assigned (assigned_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Request Status History Table (Tracks status transitions)
+CREATE TABLE IF NOT EXISTS request_status_history (
+    id BINARY(16) PRIMARY KEY,
+    request_id BINARY(16) NOT NULL,
+    previous_status VARCHAR(50) NOT NULL,
+    new_status VARCHAR(50) NOT NULL,
+    assigned_role VARCHAR(20) NOT NULL,
+    assigned_user_id BINARY(16) NOT NULL,
+    remarks TEXT,
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    days_spent_days INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    version_num BIGINT NOT NULL DEFAULT 0,
+    FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE RESTRICT,
+    FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    INDEX idx_rsh_request (request_id),
+    INDEX idx_rsh_changed_at (changed_at),
+    INDEX idx_rsh_new_status (new_status),
+    INDEX idx_rsh_assigned_role (assigned_role),
+    INDEX idx_rsh_assigned_user (assigned_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Delays Table (Updated for JPA/Hibernate compatibility)

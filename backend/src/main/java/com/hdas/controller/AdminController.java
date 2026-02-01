@@ -2,10 +2,12 @@ package com.hdas.controller;
 
 import com.hdas.dto.CreateUserRequest;
 import com.hdas.dto.UpdateUserRequest;
+import com.hdas.dto.admin.AdminDelayDashboardResponse;
 import com.hdas.security.RequirePermission;
 import com.hdas.security.RequireRole;
 import com.hdas.security.RoleBasedAccessControl;
 import com.hdas.service.AuditService;
+import com.hdas.service.AdminAnalyticsService;
 import com.hdas.service.FeatureFlagService;
 import com.hdas.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class AdminController {
     private final UserService userService;
     private final AuditService auditService;
     private final FeatureFlagService featureFlagService;
+    private final AdminAnalyticsService adminAnalyticsService;
     
     @GetMapping("/dashboard")
     public ResponseEntity<Map<String, Object>> getDashboard(HttpServletRequest httpRequest) {
@@ -45,6 +48,12 @@ public class AdminController {
             )
         );
         
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/delay-dashboard")
+    public ResponseEntity<AdminDelayDashboardResponse> getDelayDashboard() {
+        var response = adminAnalyticsService.getDelayDashboard();
         return ResponseEntity.ok(response);
     }
 
@@ -147,12 +156,21 @@ public class AdminController {
         log.info("Admin creating user: {}", request.getUsername());
         
         try {
+            // Generate temporary password if missing; never log or audit plaintext
+            String temporaryPassword = null;
+            if (request.getPassword() == null || request.getPassword().isBlank()) {
+                temporaryPassword = userService.generateTemporaryPassword();
+                request.setPassword(temporaryPassword);
+            }
+
             var user = userService.createUser(request, httpRequest);
             return ResponseEntity.ok(Map.of(
                 "message", "User created successfully",
                 "userId", user.getId(),
                 "username", user.getUsername(),
-                "role", user.getRoles()
+                "role", user.getRoles(),
+                // Return temporary password only when generated server-side
+                "temporaryPassword", temporaryPassword
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(

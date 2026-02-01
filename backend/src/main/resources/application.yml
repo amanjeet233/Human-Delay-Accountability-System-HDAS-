@@ -1,11 +1,10 @@
 spring:
   application:
     name: hdas-backend
-
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:hdas}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:Amanjeet@4321.}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
@@ -27,12 +26,12 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
-  
+
   flyway:
-    enabled: false
+    enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
-  
+
   servlet:
     multipart:
       enabled: true
@@ -40,7 +39,7 @@ spring:
       max-request-size: 10MB
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   error:
     include-message: always
     include-binding-errors: always

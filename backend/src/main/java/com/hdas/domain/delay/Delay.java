@@ -36,12 +36,19 @@ public class Delay extends com.hdas.domain.common.BaseEntity {
     @jakarta.validation.constraints.Min(value = 0, message = "Delay seconds must be non-negative")
     @Column(nullable = false, columnDefinition = "BIGINT")
     private Long delaySeconds;
+
+    @Column(name = "delay_days", nullable = false)
+    @Builder.Default
+    private Integer delayDays = 0;
     
     @Column(columnDefinition = "TEXT")
     private String reason;
     
     @Column(length = 100)
     private String reasonCategory;
+
+    @Column(name = "responsible_role", length = 100)
+    private String responsibleRole;
     
     @Column(nullable = false)
     @Builder.Default

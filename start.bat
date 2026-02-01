@@ -3,6 +3,13 @@ title HDAS Launcher
 echo Starting HDAS Applications...
 cd /d "%~dp0"
 
+REM Load backend environment variables (DB credentials)
+if exist "%~dp0backend\application.env" (
+	for /f "usebackq tokens=1* delims==" %%A in ("%~dp0backend\application.env") do (
+		set "%%A=%%B"
+	)
+)
+
 REM Detect existing backend on 8080-8090 via /actuator/health
 set "BACK_PORT=8080"
 set "SKIP_BACKEND=0"
@@ -28,7 +35,9 @@ if "%SKIP_BACKEND%"=="0" (
 
 REM Start Backend with dev profile in a new window on chosen port
 if "%SKIP_BACKEND%"=="0" (
-	start "HDAS Backend (dev) - Port %BACK_PORT%" "%ComSpec%" /k "cd /d backend && mvn spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--server.port=%BACK_PORT%"
+	start "HDAS Backend (dev) - Port %BACK_PORT%" cmd /k "cd /d backend && set SPRING_PROFILES_ACTIVE=dev && set SERVER_PORT=%BACK_PORT% && mvn spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--server.port=%BACK_PORT%"
+) else (
+	echo [INFO] Backend already running on port %BACK_PORT%.
 )
 
 REM Small delay before starting frontend

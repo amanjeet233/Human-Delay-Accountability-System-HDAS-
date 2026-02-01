@@ -14,4 +14,5 @@ public class AuthResponse {
     private String username;
     private String email;
     private String role;  // PRIMARY ROLE for frontend routing (singular)
+    private boolean mustChangePassword; // indicates first-login flow is required
 }

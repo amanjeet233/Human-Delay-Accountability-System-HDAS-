@@ -3,8 +3,11 @@ package com.hdas.controller;
 import com.hdas.domain.request.Request;
 import com.hdas.security.RoleBasedAccessControl;
 import com.hdas.service.AuditService;
+import com.hdas.repository.DelayRepository;
 import com.hdas.service.FeatureFlagService;
 import com.hdas.service.RequestService;
+import com.hdas.repository.UserRepository;
+import com.hdas.security.RequirePermission;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,8 @@ public class RequestController {
     private final RequestService requestService;
     private final AuditService auditService;
     private final FeatureFlagService featureFlagService;
+    private final UserRepository userRepository;
+    private final DelayRepository delayRepository;
     private static final Logger log = Logger.getLogger(RequestController.class.getName());
     
     @PostMapping
@@ -96,6 +101,19 @@ public class RequestController {
         try {
             String username = RoleBasedAccessControl.getCurrentUsername();
             List<Request> requests = requestService.getRequestsByCreatorUsername(username);
+            // Compute assigned role per request using batch assignments (latest by assignedAt)
+            List<UUID> requestIds = requests.stream().map(Request::getId).toList();
+            java.util.Map<UUID, String> roleByRequest = new java.util.HashMap<>();
+            if (!requestIds.isEmpty()) {
+                List<com.hdas.domain.assignment.Assignment> all = requestService.getAssignmentsByRequestIdsOrderByAssignedAtDesc(requestIds);
+                for (com.hdas.domain.assignment.Assignment a : all) {
+                    UUID rid = a.getRequest().getId();
+                    if (!roleByRequest.containsKey(rid)) {
+                        String roleName = a.getProcessStep() != null ? a.getProcessStep().getResponsibleRole() : null;
+                        roleByRequest.put(rid, roleName != null ? roleName : "-");
+                    }
+                }
+            }
             List<Map<String, Object>> response = requests.stream()
                 .map(request -> Map.of(
                     "id", (Object) request.getId().toString(),
@@ -103,7 +121,8 @@ public class RequestController {
                     "description", (Object) request.getDescription(),
                     "status", (Object) request.getStatus(),
                     "createdAt", (Object) request.getCreatedAt().toString(),
-                    "processId", (Object) request.getProcess().getId().toString()
+                    "processId", (Object) request.getProcess().getId().toString(),
+                    "assignedRole", (Object) roleByRequest.getOrDefault(request.getId(), "-")
                 ))
                 .toList();
             
@@ -113,6 +132,85 @@ public class RequestController {
                 "error", "REQUEST_FETCH_FAILED",
                 "message", e.getMessage()
             )));
+        }
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasRole('CITIZEN')")
+    public ResponseEntity<Map<String, Object>> getOwnRequestsPaged(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "sort", defaultValue = "createdAt,desc") String sort,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "role", required = false) String role,
+            HttpServletRequest httpRequest) {
+        log.info("Citizen viewing own requests (paged): page=" + page + ", size=" + size + ", sort=" + sort + ", status=" + status + ", role=" + role);
+
+        try {
+            String username = RoleBasedAccessControl.getCurrentUsername();
+            var user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+            // Normalize empty filters to null
+            String statusFilter = (status != null && !status.isBlank()) ? status.trim().toUpperCase() : null;
+            String roleFilter = (role != null && !role.isBlank()) ? role.trim().toUpperCase() : null;
+
+            // Parse sort param like "field,dir"
+            String[] parts = sort.split(",");
+            String field = parts.length > 0 ? parts[0] : "createdAt";
+            String dir = parts.length > 1 ? parts[1] : "desc";
+            org.springframework.data.domain.Sort.Direction direction = "asc".equalsIgnoreCase(dir)
+                    ? org.springframework.data.domain.Sort.Direction.ASC
+                    : org.springframework.data.domain.Sort.Direction.DESC;
+
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                    page,
+                    Math.max(1, Math.min(100, size)),
+                    org.springframework.data.domain.Sort.by(direction, field)
+            );
+
+            var pageData = requestService.findRequestsByCreatorPagedWithFilters(user.getId(), statusFilter, roleFilter, pageable);
+            List<Request> requests = pageData.getContent();
+
+            // Batch assigned role resolution
+            List<UUID> requestIds = requests.stream().map(Request::getId).toList();
+            java.util.Map<UUID, String> roleByRequest = new java.util.HashMap<>();
+            if (!requestIds.isEmpty()) {
+                List<com.hdas.domain.assignment.Assignment> all = requestService.getAssignmentsByRequestIdsOrderByAssignedAtDesc(requestIds);
+                for (com.hdas.domain.assignment.Assignment a : all) {
+                    UUID rid = a.getRequest().getId();
+                    if (!roleByRequest.containsKey(rid)) {
+                        String roleName = a.getProcessStep() != null ? a.getProcessStep().getResponsibleRole() : null;
+                        roleByRequest.put(rid, roleName != null ? roleName : "-");
+                    }
+                }
+            }
+
+            List<Map<String, Object>> items = requests.stream()
+                .map(request -> Map.of(
+                    "id", (Object) request.getId().toString(),
+                    "title", (Object) request.getTitle(),
+                    "description", (Object) request.getDescription(),
+                    "status", (Object) request.getStatus(),
+                    "createdAt", (Object) request.getCreatedAt().toString(),
+                    "processId", (Object) request.getProcess().getId().toString(),
+                    "assignedRole", (Object) roleByRequest.getOrDefault(request.getId(), "-")
+                ))
+                .toList();
+
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("items", items);
+            response.put("page", pageData.getNumber());
+            response.put("size", pageData.getSize());
+            response.put("total", pageData.getTotalElements());
+            response.put("totalPages", pageData.getTotalPages());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "REQUEST_FETCH_FAILED",
+                "message", e.getMessage()
+            ));
         }
     }
     
@@ -244,15 +342,120 @@ public class RequestController {
         return ResponseEntity.ok(requestService.startAssignment(Objects.requireNonNull(assignmentId), httpRequest));
     }
 
-    @GetMapping("/{id}/timeline")
-    @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<List<com.hdas.dto.RequestTimelineItem>> getRequestTimeline(@PathVariable @NonNull UUID id) {
-        return ResponseEntity.ok(requestService.getRequestTimeline(Objects.requireNonNull(id)));
+    @GetMapping("/assignments/my")
+    @RequirePermission(RoleBasedAccessControl.Permission.VIEW_ASSIGNED_REQUESTS)
+    public ResponseEntity<Map<String, Object>> getMyAssignments(
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(name = "size", required = false, defaultValue = "10") int size) {
+        String username = RoleBasedAccessControl.getCurrentUsername();
+        var user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, size));
+        var pageData = requestService.getAssignmentsForUserPaged(user.getId(), status, pageable);
+        var items = pageData.getContent().stream().map(a -> {
+            Map<String, Object> m = new java.util.HashMap<>();
+            m.put("assignmentId", a.getId().toString());
+            m.put("requestId", a.getRequest().getId().toString());
+            m.put("requestTitle", a.getRequest().getTitle());
+            m.put("role", a.getProcessStep() != null ? a.getProcessStep().getResponsibleRole() : null);
+            m.put("status", a.getStatus());
+            m.put("assignedAt", a.getAssignedAt() != null ? a.getAssignedAt().toString() : null);
+            m.put("startedAt", a.getStartedAt() != null ? a.getStartedAt().toString() : null);
+            m.put("allowedDurationSeconds", a.getAllowedDurationSeconds());
+            return m;
+        }).toList();
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("content", items);
+        response.put("page", pageData.getNumber());
+        response.put("size", pageData.getSize());
+        response.put("totalElements", pageData.getTotalElements());
+        response.put("totalPages", pageData.getTotalPages());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/assignments/{assignmentId}/delays")
+    @RequirePermission(RoleBasedAccessControl.Permission.VIEW_DELAY_REPORTS)
+    public ResponseEntity<java.util.List<Map<String, Object>>> getAssignmentDelays(@PathVariable UUID assignmentId) {
+        var delays = delayRepository.findByAssignmentId(Objects.requireNonNull(assignmentId));
+        var items = delays.stream().map(d -> Map.of(
+                "id", (Object) d.getId().toString(),
+                "delayDays", (Object) d.getDelayDays(),
+                "delaySeconds", (Object) d.getDelaySeconds(),
+                "reason", (Object) d.getReason(),
+                "justified", (Object) d.getJustified(),
+                "detectedAt", (Object) (d.getDetectedAt() != null ? d.getDetectedAt().toString() : null)
+        )).toList();
+        return ResponseEntity.ok(items);
+    }
+
+        @GetMapping("/{id}/timeline")
+        @RequirePermission(RoleBasedAccessControl.Permission.VIEW_ALL_DATA)
+    @com.hdas.security.RequireRole({
+            RoleBasedAccessControl.SystemRole.CITIZEN,
+            RoleBasedAccessControl.SystemRole.ADMIN,
+            RoleBasedAccessControl.SystemRole.AUDITOR
+    })
+    public ResponseEntity<com.hdas.dto.RequestTimelineResponse> getRequestTimeline(@PathVariable @NonNull UUID id) {
+        // Ownership check: Citizens can only view their own requests
+        var currentRole = RoleBasedAccessControl.getCurrentUserRole();
+        if (currentRole == RoleBasedAccessControl.SystemRole.CITIZEN) {
+            var username = RoleBasedAccessControl.getCurrentUsername();
+            var user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            var request = requestService.getRequestById(Objects.requireNonNull(id))
+                    .orElseThrow(() -> new RuntimeException("Request not found"));
+            if (!request.getCreatedBy().getId().equals(user.getId())) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                        .body(null);
+            }
+        }
+
+        return ResponseEntity.ok(requestService.getFullRequestTimeline(Objects.requireNonNull(id)));
+    }
+
+    @PostMapping("/{id}/forward")
+    @PreAuthorize("hasAnyRole('CLERK','SECTION_OFFICER','HOD','ADMIN')")
+    @RequirePermission(RoleBasedAccessControl.Permission.FORWARD_REQUEST)
+    public ResponseEntity<Map<String, Object>> forwardRequest(
+            @PathVariable @NonNull UUID id,
+            @RequestBody ForwardRequestDto dto,
+            HttpServletRequest httpRequest) {
+        try {
+            var assignment = requestService.forwardRequest(Objects.requireNonNull(id), dto.getTargetRole(), dto.getRemarks(), httpRequest);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Request forwarded",
+                    "requestId", id,
+                    "status", "IN_PROGRESS",
+                    "nextRole", assignment.getProcessStep().getResponsibleRole(),
+                    "assignedTo", assignment.getAssignedTo().getUsername()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "FORWARD_FAILED",
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/{id}/forward/options")
+    @RequirePermission(RoleBasedAccessControl.Permission.FORWARD_REQUEST)
+    public ResponseEntity<Map<String, Object>> getForwardOptions(@PathVariable @NonNull UUID id) {
+        java.util.List<String> roles = requestService.getNextRolesForRequest(Objects.requireNonNull(id));
+        return ResponseEntity.ok(Map.of(
+                "roles", roles
+        ));
     }
     
     @Data
     public static class CompleteAssignmentDto {
         private String action; // APPROVE, REJECT, FORWARD
         private String notes;
+    }
+
+    @Data
+    public static class ForwardRequestDto {
+        private String targetRole;
+        private String remarks;
     }
 }

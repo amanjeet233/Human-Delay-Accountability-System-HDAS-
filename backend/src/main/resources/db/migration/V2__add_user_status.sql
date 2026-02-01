@@ -2,10 +2,17 @@
 -- Date: 2026-01-31
 -- Purpose: Support user registration workflow with PENDING status
 
--- Add status column to users table
-ALTER TABLE users 
-ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' 
-AFTER active;
+-- Check and add status column (MySQL 8.0 compatible)
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'status');
+
+SET @sql = IF(@col_exists = 0, 
+    'ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT ''ACTIVE'' AFTER active', 
+    'SELECT "Column already exists" AS message INTO @dummy');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Update existing users to ACTIVE status
 UPDATE users 
@@ -17,13 +24,14 @@ UPDATE users
 SET status = 'SUSPENDED' 
 WHERE active = FALSE;
 
--- Add index for status queries
-CREATE INDEX idx_user_status ON users(status);
+-- Check and add index (MySQL 8.0 compatible)  
+SET @index_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND INDEX_NAME = 'idx_user_status');
 
--- Verify migration
-SELECT 
-    COUNT(*) as total_users,
-    SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) as active_users,
-    SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending_users,
-    SUM(CASE WHEN status = 'SUSPENDED' THEN 1 ELSE 0 END) as suspended_users
-FROM users;
+SET @sql = IF(@index_exists = 0, 
+    'CREATE INDEX idx_user_status ON users(status)', 
+    'SELECT "Index already exists" AS message INTO @dummy');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

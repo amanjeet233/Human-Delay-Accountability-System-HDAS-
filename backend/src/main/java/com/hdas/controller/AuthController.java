@@ -4,11 +4,13 @@ import com.hdas.dto.AuthRequest;
 import com.hdas.dto.AuthResponse;
 import com.hdas.dto.RegisterRequest;
 import com.hdas.dto.ChangePasswordRequest;
+import com.hdas.dto.FirstLoginChangePasswordRequest;
 import com.hdas.domain.user.Role;
 import com.hdas.domain.user.User;
 import com.hdas.repository.RoleRepository;
 import com.hdas.repository.UserRepository;
 import com.hdas.service.AuthService;
+import com.hdas.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +38,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final UserService userService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@jakarta.validation.Valid @RequestBody RegisterRequest request) {
@@ -111,6 +114,36 @@ public class AuthController {
                 .email(null)
                 .build());
         }
+    }
+    @PostMapping("/first-login/change-password")
+    public ResponseEntity<Void> firstLoginChangePassword(@jakarta.validation.Valid @RequestBody FirstLoginChangePasswordRequest request, HttpServletRequest httpRequest) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return ResponseEntity.status(401).build();
+        }
+        String username = authentication.getName();
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(404).build();
+        }
+        if (!Boolean.TRUE.equals(user.getMustChangePassword())) {
+            return ResponseEntity.status(400).build();
+        }
+
+        if (request.getNewPassword() == null || request.getNewPassword().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Complete first-login password change
+        userService.completeFirstLoginPasswordChange(user.getId(), request.getNewPassword(), httpRequest);
+
+        // Invalidate current session to enforce re-login with new password
+        SecurityContextHolder.clearContext();
+        HttpSession session = httpRequest.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/me")

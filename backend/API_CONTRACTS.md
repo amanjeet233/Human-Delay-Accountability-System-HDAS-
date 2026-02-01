@@ -117,6 +117,16 @@ This document captures the final API contracts per role. All URLs, methods, and 
 | POST | `/requests` | `{title, description, processId}` | `{message, requestId, status}` | ✅ STABLE |
 | GET | `/requests/{id}` | - | `Request` | ✅ STABLE |
 | GET | `/requests/{id}/timeline` | - | `TimelineEvent[]` | ✅ STABLE |
+---
+
+## Shared Request APIs
+
+These endpoints are accessible to multiple roles.
+
+| Method | Endpoint | Roles | Response Schema | Status |
+|--------|----------|-------|-----------------|--------|
+| GET | `/api/requests/{id}/timeline` | `CITIZEN` (own only), `ADMIN`, `AUDITOR` | `RequestTimelineResponse` (full history, daysByRole, delays, totalDaysDelayed) | ✅ STABLE |
+
 | GET | `/notifications` | - | `Notification[]` | ⚠️ FEATURE_FLAGGED |
 
 ---

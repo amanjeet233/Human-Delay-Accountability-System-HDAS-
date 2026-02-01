@@ -43,6 +43,7 @@ public class AuthService {
             .username(user.getUsername())
             .email(user.getEmail())
             .role(primaryRole)
+            .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
             .build();
     }
 }

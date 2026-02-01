@@ -12,6 +12,11 @@ import java.util.stream.Collectors;
 @Component
 @Slf4j
 public class RoleBasedAccessControl {
+    private final com.hdas.repository.RoleRepository roleRepository;
+
+    public RoleBasedAccessControl(com.hdas.repository.RoleRepository roleRepository) {
+        this.roleRepository = roleRepository;
+    }
     
     public enum SystemRole {
         CITIZEN("CITIZEN"),
@@ -88,74 +93,14 @@ public class RoleBasedAccessControl {
         }
     }
     
-    // Role-Permission Mapping
-    private static final List<Permission> CITIZEN_PERMISSIONS = Arrays.asList(
-            Permission.CREATE_REQUEST,
-            Permission.UPLOAD_DOCUMENTS,
-            Permission.VIEW_OWN_REQUESTS
-    );
-    
-    private static final List<Permission> CLERK_PERMISSIONS = Arrays.asList(
-            Permission.VIEW_ASSIGNED_REQUESTS,
-            Permission.VERIFY_REQUEST,
-            Permission.FORWARD_REQUEST,
-            Permission.ADD_DELAY_REASON
-    );
-    
-    private static final List<Permission> SECTION_OFFICER_PERMISSIONS = Arrays.asList(
-            Permission.VIEW_ASSIGNED_REQUESTS,
-            Permission.VERIFY_REQUEST,
-            Permission.FORWARD_REQUEST,
-            Permission.APPROVE_REQUEST,
-            Permission.REJECT_REQUEST,
-            Permission.VIEW_ESCALATION_ALERTS
-    );
-    
-    private static final List<Permission> HOD_PERMISSIONS = Arrays.asList(
-            Permission.VIEW_ASSIGNED_REQUESTS,
-            Permission.FINAL_APPROVE,
-            Permission.FINAL_REJECT,
-            Permission.HANDLE_ESCALATIONS,
-            Permission.VIEW_DEPARTMENT_SUMMARY
-    );
-    
-    private static final List<Permission> ADMIN_PERMISSIONS = Arrays.asList(
-            Permission.CREATE_USERS,
-            Permission.UPDATE_USERS,
-            Permission.DELETE_USERS,
-            Permission.ASSIGN_ROLES,
-            Permission.CONFIGURE_PROCESSES,
-            Permission.MANAGE_FEATURE_FLAGS,
-            Permission.VIEW_ALL_DATA,
-            Permission.VIEW_ANALYTICS
-    );
-    
-    private static final List<Permission> AUDITOR_PERMISSIONS = Arrays.asList(
-            Permission.VIEW_AUDIT_LOGS,
-            Permission.VIEW_DELAY_REPORTS,
-            Permission.EXPORT_DATA
-    );
-    
-    public static List<Permission> getPermissionsForRole(SystemRole role) {
-        switch (role) {
-            case CITIZEN:
-                return CITIZEN_PERMISSIONS;
-            case CLERK:
-                return CLERK_PERMISSIONS;
-            case SECTION_OFFICER:
-                return SECTION_OFFICER_PERMISSIONS;
-            case HOD:
-                return HOD_PERMISSIONS;
-            case ADMIN:
-                return ADMIN_PERMISSIONS;
-            case AUDITOR:
-                return AUDITOR_PERMISSIONS;
-            default:
-                return Arrays.asList();
-        }
+    // Role-Permission mapping now sourced from DB via Role entity
+    private List<String> getPermissionCodesForRoleName(String roleName) {
+        return roleRepository.findByName(roleName)
+                .map(r -> new java.util.ArrayList<>(r.getPermissions()))
+                .orElseGet(java.util.ArrayList::new);
     }
     
-    public static boolean hasPermission(Authentication authentication, Permission permission) {
+    public boolean hasPermission(Authentication authentication, Permission permission) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
         }
@@ -166,9 +111,9 @@ public class RoleBasedAccessControl {
         
         for (String roleName : userRoles) {
             try {
-                SystemRole role = SystemRole.fromString(roleName);
-                List<Permission> rolePermissions = getPermissionsForRole(role);
-                if (rolePermissions.contains(permission)) {
+                // Fetch permissions from DB for each role
+                List<String> codes = getPermissionCodesForRoleName(roleName);
+                if (codes.contains(permission.getPermissionName())) {
                     return true;
                 }
             } catch (IllegalArgumentException e) {

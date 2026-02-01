@@ -16,9 +16,11 @@ import java.util.Map;
 
 @Component
 @Slf4j
+@lombok.RequiredArgsConstructor
 public class RoleBasedSecurityInterceptor implements HandlerInterceptor {
     
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RoleBasedAccessControl roleBasedAccessControl;
     
     @Override
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) throws Exception {
@@ -45,7 +47,7 @@ public class RoleBasedSecurityInterceptor implements HandlerInterceptor {
             if (requirePermission != null) {
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                 for (RoleBasedAccessControl.Permission permission : requirePermission.value()) {
-                    if (!RoleBasedAccessControl.hasPermission(authentication, permission)) {
+                    if (!roleBasedAccessControl.hasPermission(authentication, permission)) {
                         log.warn("Access denied for user {} to method {}. Required permission: {}", 
                                 RoleBasedAccessControl.getCurrentUsername(),
                                 handlerMethod.getMethod().getName(),
