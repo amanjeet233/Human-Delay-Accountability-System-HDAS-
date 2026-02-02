@@ -83,13 +83,22 @@ public class RoleBasedSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3001", "http://127.0.0.1:3001"));
+        // Allow frontend requests from multiple common development ports
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:3000",      // React default
+            "http://localhost:3001",      // Alternative React port
+            "http://localhost:5173",      // Vite default
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
+            "http://127.0.0.1:5173"
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
+        log.info("CORS configured for origins: localhost:3000, 3001, 5173");
         return source;
     }
 

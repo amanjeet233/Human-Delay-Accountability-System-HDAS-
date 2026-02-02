@@ -95,7 +95,10 @@ public class AuthController {
     
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request, HttpServletRequest httpRequest) {
-        log.info("Authentication attempt for user: {}", request.getUsername());
+        // Generate correlation ID for tracking this login attempt
+        String correlationId = java.util.UUID.randomUUID().toString().substring(0, 8);
+        log.info("[{}] Login attempt for user: {}", correlationId, request.getUsername());
+        
         try {
             Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
@@ -105,10 +108,41 @@ public class AuthController {
                 SecurityContextHolder.getContext());
 
             AuthResponse response = authService.buildAuthResponse(request.getUsername());
-            log.info("Authentication successful for user: {} with role: {}", request.getUsername(), response.getRole());
+            log.info("[{}] ✓ Login successful for user: {} with role: {}", 
+                correlationId, request.getUsername(), response.getRole());
             return ResponseEntity.ok(response);
+        } catch (org.springframework.security.authentication.BadCredentialsException e) {
+            log.error("[{}] ✗ Login failed - Invalid credentials for user: {}", 
+                correlationId, request.getUsername());
+            return ResponseEntity.status(401).body(AuthResponse.builder()
+                .username(null)
+                .email(null)
+                .build());
+        } catch (org.springframework.security.core.userdetails.UsernameNotFoundException e) {
+            log.error("[{}] ✗ Login failed - User not found or account inactive: {}", 
+                correlationId, request.getUsername());
+            return ResponseEntity.status(401).body(AuthResponse.builder()
+                .username(null)
+                .email(null)
+                .build());
+        } catch (org.springframework.security.authentication.DisabledException e) {
+            log.error("[{}] ✗ Login failed - Account disabled for user: {}", 
+                correlationId, request.getUsername());
+            return ResponseEntity.status(401).body(AuthResponse.builder()
+                .username(null)
+                .email(null)
+                .build());
+        } catch (org.springframework.security.authentication.LockedException e) {
+            log.error("[{}] ✗ Login failed - Account locked for user: {}", 
+                correlationId, request.getUsername());
+            return ResponseEntity.status(401).body(AuthResponse.builder()
+                .username(null)
+                .email(null)
+                .build());
         } catch (Exception e) {
-            log.error("Authentication failed for user: {}", request.getUsername(), e);
+            log.error("[{}] ✗ Login failed - Unexpected error for user: {} - {}", 
+                correlationId, request.getUsername(), e.getClass().getSimpleName());
+            log.debug("[{}] Exception details:", correlationId, e);
             return ResponseEntity.status(401).body(AuthResponse.builder()
                 .username(null)
                 .email(null)

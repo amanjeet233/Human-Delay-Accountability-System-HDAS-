@@ -43,18 +43,35 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        log.debug("Loading user by username: {}", username);
+        log.info("Loading user details for authentication attempt: {}", username);
         
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+            .orElseThrow(() -> {
+                log.error("Authentication failed - User not found in database: {}", username);
+                return new UsernameNotFoundException("User not found: " + username);
+            });
         
+        // Check if user is active
         if (!user.getActive()) {
-            log.warn("Inactive user attempted login: {}", username);
+            log.error("Authentication failed - User account is inactive: {} (active={})", username, user.getActive());
             throw new UsernameNotFoundException("User account is disabled: " + username);
         }
         
+        // Check user status
+        if (user.getStatus() != com.hdas.domain.user.UserStatus.ACTIVE) {
+            log.error("Authentication failed - User status is not ACTIVE: {} (status={})", username, user.getStatus());
+            throw new UsernameNotFoundException("User account status is invalid: " + username);
+        }
+        
+        // Check if user has roles
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            log.error("Authentication failed - User has no roles assigned: {}", username);
+            throw new UsernameNotFoundException("User has no roles assigned: " + username);
+        }
+        
         Collection<? extends GrantedAuthority> authorities = getAuthorities(user);
-        log.debug("User {} loaded with {} authorities", username, authorities.size());
+        log.info("User {} loaded successfully with {} authorities and {} roles", 
+            username, authorities.size(), user.getRoles().size());
         
         return org.springframework.security.core.userdetails.User.builder()
             .username(user.getUsername())

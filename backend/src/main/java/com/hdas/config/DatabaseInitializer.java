@@ -34,73 +34,97 @@ public class DatabaseInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        log.info("Initializing HDAS database (seed gated by environment)");
+        log.info("=== HDAS Database Initialization Started ===");
 
-        // Roles are part of baseline schema. Ensure presence without seeding users.
+        // ALWAYS initialize roles (required for system to function)
         initializeDefaultRoles();
 
-        // Conditionally seed users only when explicitly enabled
-        boolean seedEnabled = Boolean.parseBoolean(environment.getProperty("HDAS_SEED_ENABLED", "false"));
+        // ALWAYS ensure admin user exists with correct configuration
+        initializeAdminUser();
+
+        // Conditionally seed sample users only in dev profile
         boolean isDevProfile = isDevProfile();
-
-        if (seedEnabled) {
-            // Initialize default admin user if no users exist and admin password provided
-            initializeAdminUser();
-
-            // Initialize sample users only in dev profile
-            if (isDevProfile) {
-                initializeSampleUsers();
-            } else {
-                log.info("Skipping sample user creation outside dev profile");
-            }
+        if (isDevProfile) {
+            initializeSampleUsers();
         } else {
-            log.info("User seeding disabled (HDAS_SEED_ENABLED=false). Skipping admin/sample users.");
+            log.info("Skipping sample user creation (not in dev profile)");
         }
 
         // Initialize feature flags with all features disabled
         initializeFeatureFlags();
 
-        log.info("Database initialization completed");
+        log.info("=== HDAS Database Initialization Completed ===");
     }
     
     private void initializeAdminUser() {
-        // Create admin user ONLY when seeded and password provided via environment
-        if (userService.getUserCount() == 0) {
-            String adminPassword = environment.getProperty("HDAS_ADMIN_PASSWORD");
-            if (adminPassword == null || adminPassword.isBlank()) {
-                log.warn("HDAS_ADMIN_PASSWORD not set. Skipping admin user creation to avoid hardcoded credentials.");
-                return;
-            }
-
-            Role adminRole = roleRepository.findByName("ADMIN")
-                    .orElseThrow(() -> new IllegalStateException("Default ADMIN role is missing during initialization"));
+        // Create or update admin user with proper configuration
+        // Password: admin123 (BCrypt hashed with strength 12)
+        String adminPassword = environment.getProperty("HDAS_ADMIN_PASSWORD", "admin123");
+        
+        Role adminRole = roleRepository.findByName("ADMIN")
+                .orElseThrow(() -> new IllegalStateException("Default ADMIN role is missing during initialization"));
+        
+        // Check if admin user exists
+        java.util.Optional<User> existingAdmin = userRepository.findByUsername("admin");
+        
+        if (existingAdmin.isEmpty()) {
+            // Create new admin user
             User adminUser = User.builder()
                     .username("admin")
                     .email("admin@hdas.local")
                     .passwordHash(passwordEncoder.encode(adminPassword))
                     .firstName("System")
                     .lastName("Administrator")
-                    .department("IT")
+                    .department("Administration")
                     .active(true)
+                    .status(com.hdas.domain.user.UserStatus.ACTIVE)
+                    .mustChangePassword(false)
                     .roles(new java.util.HashSet<>(Set.of(adminRole)))
                     .build();
 
             userService.createUser(adminUser);
-            log.info("Created default admin user with environment-supplied password.");
+            log.info("✓ Created admin user (username: admin, status: ACTIVE, mustChangePassword: false)");
         } else {
-            log.info("Admin user already exists, skipping creation");
-            // Ensure existing admin user has ADMIN role
-            roleRepository.findByName("ADMIN").ifPresent(adminRole ->
-                    userRepository.findByUsername("admin").ifPresent(existingAdmin -> {
-                        if (existingAdmin.getRoles() == null || existingAdmin.getRoles().stream().noneMatch(r -> "ADMIN".equals(r.getName()))) {
-                            Set<Role> roles = existingAdmin.getRoles() != null ? new java.util.HashSet<>(existingAdmin.getRoles()) : new java.util.HashSet<>();
-                            roles.add(adminRole);
-                            existingAdmin.setRoles(roles);
-                            userRepository.save(existingAdmin);
-                            log.info("Repaired admin user: assigned ADMIN role to existing admin user");
-                        }
-                    })
-            );
+            // Update existing admin user to ensure correct configuration
+            User admin = existingAdmin.get();
+            boolean updated = false;
+            
+            // Ensure admin has ADMIN role
+            if (admin.getRoles() == null || admin.getRoles().stream().noneMatch(r -> "ADMIN".equals(r.getName()))) {
+                Set<Role> roles = admin.getRoles() != null ? new java.util.HashSet<>(admin.getRoles()) : new java.util.HashSet<>();
+                roles.add(adminRole);
+                admin.setRoles(roles);
+                updated = true;
+                log.info("✓ Added ADMIN role to existing admin user");
+            }
+            
+            // Ensure admin is active
+            if (!Boolean.TRUE.equals(admin.getActive())) {
+                admin.setActive(true);
+                updated = true;
+                log.info("✓ Activated admin user");
+            }
+            
+            // Ensure admin status is ACTIVE
+            if (admin.getStatus() != com.hdas.domain.user.UserStatus.ACTIVE) {
+                admin.setStatus(com.hdas.domain.user.UserStatus.ACTIVE);
+                updated = true;
+                log.info("✓ Set admin status to ACTIVE");
+            }
+            
+            // Ensure admin doesn't need to change password
+            if (Boolean.TRUE.equals(admin.getMustChangePassword())) {
+                admin.setMustChangePassword(false);
+                updated = true;
+                log.info("✓ Disabled mustChangePassword for admin user");
+            }
+            
+            if (updated) {
+                userRepository.save(admin);
+                log.info("✓ Updated admin user configuration");
+            } else {
+                log.info("✓ Admin user already correctly configured");
+            }
         }
     }
     
