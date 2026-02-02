@@ -42,7 +42,7 @@ export default function ForwardPage({ params }: { params: { id: string } }) {
       setSuccess(null);
       await api.post(`/requests/${id}/forward`, { targetRole, remarks });
       setSuccess('Request forwarded successfully');
-      setTimeout(() => router.push('/tasks'), 800);
+      setTimeout(() => router.push('/clerk/tasks'), 800);
     } catch (e: any) {
       setError(e?.message || 'Failed to forward request');
     } finally {

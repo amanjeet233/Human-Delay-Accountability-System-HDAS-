@@ -169,7 +169,7 @@ public class RoleBasedSecurityConfig {
 
                 // CLERK - Task execution
                 .requestMatchers("/api/clerk/**").hasRole("CLERK")
-                .requestMatchers("/api/tasks/my/**").hasRole("CLERK")
+                .requestMatchers("/api/tasks/my/**").hasAnyRole("CLERK","SECTION_OFFICER","HOD")
                 .requestMatchers("/api/tasks/**").hasRole("CLERK")
                 .requestMatchers("/api/dashboard/clerk/**").hasRole("CLERK")
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search } from 'lucide-react';
+import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search, KeyRound } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { api } from '@/lib/api';
@@ -24,6 +24,16 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAssignRoleModal, setShowAssignRoleModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [createForm, setCreateForm] = useState<{username: string; email: string; role: string; active: boolean}>({ username: '', email: '', role: 'CITIZEN', active: true });
+  const [editForm, setEditForm] = useState<{email: string; firstName?: string; lastName?: string; active: boolean}>({ email: '', firstName: '', lastName: '', active: true });
+  const [assignRole, setAssignRole] = useState<string>('CITIZEN');
+  const roles = ['ADMIN','SECTION_OFFICER','CLERK','HOD','AUDITOR','CITIZEN'];
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -56,6 +66,7 @@ export default function UsersPage() {
   }
 
   return (
+    <>
     <div className="flex h-screen bg-background">
       <Sidebar />
       
@@ -139,10 +150,16 @@ export default function UsersPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" onClick={() => { setSelectedUser(user); setEditForm({ email: user.email, firstName: user.firstName, lastName: user.lastName, active: user.active }); setShowEditModal(true); }}>
                                 <Edit size={16} className="text-gray-600" />
                               </button>
-                              <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" onClick={() => { setSelectedUser(user); setAssignRole(user.role); setShowAssignRoleModal(true); }}>
+                                <Shield size={16} className="text-primary" />
+                              </button>
+                              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" onClick={() => { setSelectedUser(user); setNewPassword(''); setShowResetPasswordModal(true); }}>
+                                <KeyRound size={16} className="text-gray-600" />
+                              </button>
+                              <button className="p-2 hover:bg-red-50 rounded-lg transition-colors" onClick={async () => { setSubmitting(true); try { await api.delete(`/admin/users/${user.id}`); await loadUsers(); } finally { setSubmitting(false); } }}>
                                 <Trash2 size={16} className="text-red-600" />
                               </button>
                             </div>
@@ -165,5 +182,82 @@ export default function UsersPage() {
         </main>
       </div>
     </div>
+
+    {/* Create User Modal */}
+    {showCreateModal && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="glass-card p-6 w-full max-w-md">
+          <h3 className="text-lg font-semibold text-heading mb-4">Create User</h3>
+          <div className="space-y-3">
+            <input className="input w-full" placeholder="Username" value={createForm.username} onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })} />
+            <input className="input w-full" placeholder="Email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
+            <select className="input w-full" value={createForm.role} onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}>
+              {roles.map(r => (<option key={r} value={r}>{r}</option>))}
+            </select>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" checked={createForm.active} onChange={(e) => setCreateForm({ ...createForm, active: e.target.checked })} />
+              <span className="text-sm text-subtext">Active</span>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
+            <button className="btn-primary" disabled={submitting} onClick={async () => { setSubmitting(true); try { await api.createUser(createForm); setShowCreateModal(false); await loadUsers(); } finally { setSubmitting(false); } }}>Create</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Edit User Modal */}
+    {showEditModal && selectedUser && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="glass-card p-6 w-full max-w-md">
+          <h3 className="text-lg font-semibold text-heading mb-4">Edit User</h3>
+          <div className="space-y-3">
+            <input className="input w-full" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+            <input className="input w-full" placeholder="First Name" value={editForm.firstName || ''} onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })} />
+            <input className="input w-full" placeholder="Last Name" value={editForm.lastName || ''} onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })} />
+            <div className="flex items-center gap-2">
+              <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} />
+              <span className="text-sm text-subtext">Active</span>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <button className="btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+            <button className="btn-primary" disabled={submitting} onClick={async () => { setSubmitting(true); try { await api.updateUser(selectedUser.id, editForm); setShowEditModal(false); await loadUsers(); } finally { setSubmitting(false); } }}>Save</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Assign Role Modal */}
+    {showAssignRoleModal && selectedUser && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="glass-card p-6 w-full max-w-md">
+          <h3 className="text-lg font-semibold text-heading mb-4">Assign Role</h3>
+          <select className="input w-full" value={assignRole} onChange={(e) => setAssignRole(e.target.value)}>
+            {roles.map(r => (<option key={r} value={r}>{r}</option>))}
+          </select>
+          <div className="flex justify-end gap-2 mt-6">
+            <button className="btn-secondary" onClick={() => setShowAssignRoleModal(false)}>Cancel</button>
+            <button className="btn-primary" disabled={submitting} onClick={async () => { setSubmitting(true); try { await api.assignRole(selectedUser.id, assignRole); setShowAssignRoleModal(false); await loadUsers(); } finally { setSubmitting(false); } }}>Assign</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Reset Password Modal */}
+    {showResetPasswordModal && selectedUser && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="glass-card p-6 w-full max-w-md">
+          <h3 className="text-lg font-semibold text-heading mb-4">Reset Password</h3>
+          <input className="input w-full" placeholder="New Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          <div className="flex justify-end gap-2 mt-6">
+            <button className="btn-secondary" onClick={() => setShowResetPasswordModal(false)}>Cancel</button>
+            <button className="btn-primary" disabled={submitting || !newPassword} onClick={async () => { setSubmitting(true); try { await api.resetPassword(selectedUser.id, newPassword); setShowResetPasswordModal(false); await loadUsers(); } finally { setSubmitting(false); } }}>Reset</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

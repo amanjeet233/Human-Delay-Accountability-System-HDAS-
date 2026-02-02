@@ -7,16 +7,15 @@ interface NetWorthChartProps {
 }
 
 export default function NetWorthChart({ data }: NetWorthChartProps) {
-  const defaultData = [
-    { month: 'Jan', value: 45000 },
-    { month: 'Feb', value: 52000 },
-    { month: 'Mar', value: 48000 },
-    { month: 'Apr', value: 61000 },
-    { month: 'May', value: 58000 },
-    { month: 'Jun', value: 72000 },
-  ];
+  const chartData = data && data.length > 0 ? data : [];
 
-  const chartData = data || defaultData;
+  if (chartData.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-subtext text-sm">
+        No trend data available
+      </div>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height="100%">

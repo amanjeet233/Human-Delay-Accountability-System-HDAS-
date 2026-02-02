@@ -147,13 +147,32 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<AuthResponse> me() {
+    public ResponseEntity<com.hdas.dto.CurrentUserResponse> me() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
             return ResponseEntity.status(401).build();
         }
         String username = authentication.getName();
-        AuthResponse response = authService.buildAuthResponse(username);
+        // Build primary role via existing service
+        AuthResponse auth = authService.buildAuthResponse(username);
+        // Fetch user details for id, department, permissions
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(404).build();
+        }
+        java.util.Set<String> permissions = user.getRoles().stream()
+            .filter(r -> Boolean.TRUE.equals(r.getActive()))
+            .flatMap(r -> r.getPermissions().stream())
+            .collect(java.util.stream.Collectors.toSet());
+
+        com.hdas.dto.CurrentUserResponse response = com.hdas.dto.CurrentUserResponse.builder()
+            .id(user.getId() != null ? user.getId().toString() : null)
+            .userId(user.getId() != null ? user.getId().toString() : null)
+            .username(user.getUsername())
+            .role(auth.getRole())
+            .departmentId(user.getDepartment())
+            .permissions(permissions)
+            .build();
         return ResponseEntity.ok(response);
     }
 

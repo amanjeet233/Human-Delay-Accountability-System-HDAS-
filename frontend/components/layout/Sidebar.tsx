@@ -11,7 +11,10 @@ import {
   FileText,
   Settings
 } from 'lucide-react';
-import { getUser, removeToken } from '@/lib/auth';
+import Link from 'next/link';
+import { removeToken } from '@/lib/auth';
+import { isPathAllowed } from '@/lib/roleAccess';
+import { useUser } from '@/lib/userContext';
 
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'CITIZEN', 'CLERK', 'SECTION_OFFICER', 'HOD', 'AUDITOR'] },
@@ -26,16 +29,18 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const user = getUser();
+  const { user } = useUser();
 
   const handleLogout = () => {
     removeToken();
     router.push('/login');
   };
 
-  const filteredMenu = menuItems.filter(item => 
-    item.roles.includes(user?.role || '')
-  );
+  const filteredMenu = menuItems.filter(item => {
+    const role = user?.role || '';
+    // Must be allowed by declared roles and route prefix policy
+    return item.roles.includes(role) && isPathAllowed(role, item.path);
+  });
 
   return (
     <div className="fixed left-0 top-0 h-screen w-64 bg-sidebar text-white flex flex-col">
@@ -48,16 +53,17 @@ export default function Sidebar() {
         {filteredMenu.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.path;
-          
+
           return (
-            <button
+            <Link
               key={item.path}
-              onClick={() => router.push(item.path)}
+              href={item.path}
+              prefetch
               className={`sidebar-item w-full ${isActive ? 'sidebar-item-active' : ''}`}
             >
               <Icon size={20} />
               <span>{item.label}</span>
-            </button>
+            </Link>
           );
         })}
       </nav>

@@ -7,7 +7,15 @@ interface RadialGaugeProps {
   label?: string;
 }
 
-export default function RadialGauge({ value = 72, label = 'Health Score' }: RadialGaugeProps) {
+export default function RadialGauge({ value, label = 'Health Score' }: RadialGaugeProps) {
+  if (typeof value !== 'number') {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-subtext text-sm">
+        No metric available
+      </div>
+    );
+  }
+
   const data = [
     {
       name: label,

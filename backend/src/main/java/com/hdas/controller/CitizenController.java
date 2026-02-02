@@ -2,12 +2,18 @@ package com.hdas.controller;
 
 import com.hdas.dto.CreateRequestRequest;
 import com.hdas.dto.RequestResponse;
+import com.hdas.dto.CitizenRequestItem;
 import com.hdas.security.RequirePermission;
 import com.hdas.security.RequireRole;
 import com.hdas.security.RoleBasedAccessControl;
 import com.hdas.service.AuditService;
 import com.hdas.service.FeatureFlagService;
 import com.hdas.service.RequestService;
+import com.hdas.service.DelayCalculationService;
+import com.hdas.repository.UserRepository;
+import com.hdas.repository.DelayRepository;
+import com.hdas.domain.assignment.Assignment;
+import com.hdas.domain.request.Request;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +33,9 @@ public class CitizenController {
     private final RequestService requestService;
     private final AuditService auditService;
     private final FeatureFlagService featureFlagService;
+    private final DelayCalculationService delayCalculationService;
+    private final UserRepository userRepository;
+    private final DelayRepository delayRepository;
     
     @GetMapping("/dashboard")
     public ResponseEntity<Map<String, Object>> getDashboard(HttpServletRequest httpRequest) {
@@ -84,14 +93,81 @@ public class CitizenController {
         }
     }
     
-    @GetMapping("/requests")
+    @GetMapping({"/requests", "/my-requests"})
     @RequirePermission(RoleBasedAccessControl.Permission.VIEW_OWN_REQUESTS)
-    public ResponseEntity<List<RequestResponse>> getOwnRequests() {
+    public ResponseEntity<List<CitizenRequestItem>> getOwnRequests() {
         log.info("Citizen viewing own requests");
-        
-        // Implementation would return user's requests only
-        List<RequestResponse> requests = List.of();
-        return ResponseEntity.ok(requests);
+
+        try {
+            String username = RoleBasedAccessControl.getCurrentUsername();
+            var user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            List<Request> requests = requestService.getRequestsByCreatorUsername(username);
+            // Batch latest assignment resolution by request
+            List<java.util.UUID> requestIds = requests.stream().map(Request::getId).toList();
+            java.util.Map<java.util.UUID, Assignment> latestAssignByRequest = new java.util.HashMap<>();
+            if (!requestIds.isEmpty()) {
+                List<Assignment> all = requestService.getAssignmentsByRequestIdsOrderByAssignedAtDesc(requestIds);
+                for (Assignment a : all) {
+                    java.util.UUID rid = a.getRequest().getId();
+                    if (!latestAssignByRequest.containsKey(rid)) {
+                        latestAssignByRequest.put(rid, a);
+                    }
+                }
+            }
+
+            // Build response with SLA and delay summary
+            List<CitizenRequestItem> items = new java.util.ArrayList<>();
+            for (Request r : requests) {
+                Assignment latest = latestAssignByRequest.get(r.getId());
+                String roleName = (latest != null && latest.getProcessStep() != null)
+                        ? latest.getProcessStep().getResponsibleRole() : null;
+
+                Long allowed = latest != null ? latest.getAllowedDurationSeconds() : null;
+                Long elapsed = null;
+                Long overdue = null;
+                String slaState = null;
+                if (latest != null && latest.getStartedAt() != null) {
+                    elapsed = java.time.Duration.between(latest.getStartedAt(), java.time.Instant.now()).getSeconds();
+                    long od = delayCalculationService.calculateCurrentOverdueSeconds(latest, java.time.Instant.now());
+                    overdue = od;
+                    slaState = od > 0 ? "BREACHED" : "ON_TRACK";
+                }
+
+                // Sum delays across all assignments for this request
+                int totalDaysDelayed = 0;
+                if (latestAssignByRequest.containsKey(r.getId())) {
+                    List<Assignment> assignsForRequest = requestService.getAssignmentsByRequest(r.getId());
+                    for (Assignment a : assignsForRequest) {
+                        var delays = delayRepository.findByAssignmentId(a.getId());
+                        for (var d : delays) {
+                            totalDaysDelayed += (d.getDelayDays() != null ? d.getDelayDays() : 0);
+                        }
+                    }
+                }
+
+                items.add(CitizenRequestItem.builder()
+                        .id(r.getId().toString())
+                        .title(r.getTitle())
+                        .description(r.getDescription())
+                        .status(r.getStatus())
+                        .processId(r.getProcess() != null ? r.getProcess().getId().toString() : null)
+                        .createdAt(r.getCreatedAt())
+                        .assignedRole(roleName != null ? roleName : "-")
+                        .slaAllowedSeconds(allowed)
+                        .slaElapsedSeconds(elapsed)
+                        .slaOverdueSeconds(overdue)
+                        .slaState(slaState)
+                        .totalDaysDelayed(totalDaysDelayed)
+                        .build());
+            }
+
+            return ResponseEntity.ok(items);
+        } catch (Exception e) {
+            log.error("Failed to fetch own requests", e);
+            return ResponseEntity.badRequest().body(java.util.List.of());
+        }
     }
 
     @GetMapping("/notifications")
@@ -150,16 +226,26 @@ public class CitizenController {
     
     @GetMapping("/requests/{id}/timeline")
     @RequirePermission(RoleBasedAccessControl.Permission.VIEW_OWN_REQUESTS)
-    public ResponseEntity<Map<String, Object>> getRequestTimeline(@PathVariable String id) {
+    public ResponseEntity<com.hdas.dto.RequestTimelineResponse> getRequestTimeline(@PathVariable String id) {
         log.info("Citizen viewing request timeline: {}", id);
-        
-        Map<String, Object> timeline = Map.of(
-            "requestId", id,
-            "timeline", List.of(),
-            "currentStatus", "IN_PROGRESS"
-        );
-        
-        return ResponseEntity.ok(timeline);
+
+        try {
+            java.util.UUID requestId = java.util.UUID.fromString(id);
+            var request = requestService.getRequestById(requestId)
+                    .orElseThrow(() -> new RuntimeException("Request not found"));
+            // Ownership check: citizen can only access their own requests
+            String username = RoleBasedAccessControl.getCurrentUsername();
+            var user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            if (!request.getCreatedBy().getId().equals(user.getId())) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(null);
+            }
+
+            return ResponseEntity.ok(requestService.getFullRequestTimeline(requestId));
+        } catch (Exception e) {
+            log.error("Failed to fetch timeline for request {}", id, e);
+            return ResponseEntity.badRequest().body(null);
+        }
     }
     
     @PostMapping("/requests/{id}/documents")

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, memo } from 'react';
 import StatusBadge from '@/components/common/StatusBadge';
 import TimelineModal from '@/components/requests/TimelineModal';
 import { api } from '@/lib/api';
@@ -11,11 +11,49 @@ type RequestItem = {
   description?: string;
   status: string;
   createdAt: string;
-  processId: string;
+  processId?: string;
+  category?: string;
   assignedRole?: string;
+  slaState?: 'ON_TRACK' | 'BREACHED';
+  slaAllowedSeconds?: number;
+  slaElapsedSeconds?: number;
+  slaOverdueSeconds?: number;
 };
 
-export default function MyRequestsTable() {
+const TableRow = memo(function TableRow({ row, onViewTimeline, onOpenFullPage }: {
+  row: any;
+  onViewTimeline: (id: string) => void;
+  onOpenFullPage: (id: string) => void;
+}) {
+  return (
+    <tr className="border-b border-border hover:bg-muted/40">
+      <td className="py-3 pr-4 text-subtext">{row.id}</td>
+      <td className="py-3 pr-4 text-heading">{row.category || row.processId || '-'}</td>
+      <td className="py-3 pr-4"><StatusBadge status={row.status} /></td>
+      <td className="py-3 pr-4 text-subtext">{row.assignedRole}</td>
+      <td className="py-3 pr-4 text-heading">{row.daysElapsed}</td>
+      <td className="py-3 pr-4">
+        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs border border-border bg-muted">
+          {row.slaStatus}
+        </span>
+      </td>
+      <td className="py-3 pr-4">
+        <div className="flex items-center gap-2">
+          <button
+            className="px-3 py-1.5 rounded-md bg-primary text-white text-xs hover:bg-primary/90"
+            onClick={() => onViewTimeline(row.id)}
+          >View Timeline</button>
+          <button
+            className="px-3 py-1.5 rounded-md border border-border text-xs hover:bg-muted"
+            onClick={() => onOpenFullPage(row.id)}
+          >Open Full Page</button>
+        </div>
+      </td>
+    </tr>
+  );
+});
+
+export default function MyRequestsTable({ refreshKey = 0 }: { refreshKey?: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<RequestItem[]>([]);
@@ -23,6 +61,7 @@ export default function MyRequestsTable() {
   const [error, setError] = useState<string | null>(null);
   const [timelineFor, setTimelineFor] = useState<string | null>(null);
   const [assignedRoles, setAssignedRoles] = useState<Record<string, string>>({});
+  const [slaStatusMap, setSlaStatusMap] = useState<Record<string, 'On Time' | 'Delayed'>>({});
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -54,7 +93,7 @@ export default function MyRequestsTable() {
       setTimelineFor(qpTimeline || null);
     } catch {}
     setInitialized(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist selections to URL for deep-linking
@@ -82,61 +121,98 @@ export default function MyRequestsTable() {
           status: statusFilter || '',
           role: roleFilter || ''
         }).toString();
-        const data = await api.get(`/requests/page?${qs}`);
-        setItems((data?.items || []) as RequestItem[]);
-        setTotal(data?.total || 0);
-        // Fetch assigned role (best-effort) in parallel but limited
-        // If backend provided assignedRole, skip timeline fetching
-        if ((data?.items || []).some((d: any) => !!d.assignedRole)) {
-          const roles: Record<string, string> = {};
-          (data?.items || []).forEach((d: any) => {
-            roles[d.id] = d.assignedRole || '-';
+
+        // Primary citizen endpoint per contract
+        let data: any;
+        try {
+          data = await api.get(`/citizen/my-requests?${qs}`);
+        } catch (e: any) {
+          if (e?.response?.status === 404) {
+            // Fallback to existing implementation
+            data = await api.get(`/citizen/requests`);
+          } else {
+            throw e;
+          }
+        }
+
+        const list = (data?.items || data || []) as RequestItem[];
+        setItems(list);
+        setTotal(data?.total || (data?.items ? data.items.length : (Array.isArray(data) ? data.length : 0)));
+
+        // If backend provided assignedRole/slaState, use them; otherwise, fetch via timelines
+        const roles: Record<string, string> = {};
+        const slaMap: Record<string, 'On Time' | 'Delayed'> = {};
+        const hasAssignedRole = list.some((d: any) => !!d.assignedRole);
+        const hasSlaState = list.some((d: any) => typeof d.slaState === 'string');
+        if (hasAssignedRole || hasSlaState) {
+          list.forEach((d: any) => {
+            roles[d.id] = d.assignedRole || roles[d.id] || '-';
+            const state = (d.slaState || '').toUpperCase();
+            if (state === 'BREACHED') slaMap[d.id] = 'Delayed';
+            else if (state === 'ON_TRACK') slaMap[d.id] = 'On Time';
           });
           setAssignedRoles(roles);
-          return;
+          setSlaStatusMap(slaMap);
         }
-        const ids: string[] = (data?.items || []).map((d: any) => d.id);
+
+        const ids: string[] = list.map((d: any) => d.id);
         const concurrency = 3;
         let index = 0;
-        const roles: Record<string, string> = {};
-        async function nextBatch() {
-          const batch = ids.slice(index, index + concurrency);
-          index += concurrency;
-          await Promise.all(batch.map(async (id) => {
-            try {
-              const tl = await api.get(`/requests/${id}/timeline`);
-              let role = '-';
-              if (tl?.items && Array.isArray(tl.items)) {
-                // Find last ASSIGNED event or infer from description
-                const assigned = [...tl.items].reverse().find((it: any) => (it.eventType || '').toUpperCase() === 'ASSIGNED');
-                if (assigned?.description) {
-                  // Try to parse role mentioned in description
-                  const match = assigned.description.match(/role[:\s]+([A-Z_]+)/i);
-                  role = match?.[1] || role;
+        // Fallback to timeline-based derivation only if needed
+        if (!(hasAssignedRole && hasSlaState)) {
+          const rolesFallback: Record<string, string> = { ...roles };
+          const slaMapFallback: Record<string, 'On Time' | 'Delayed'> = { ...slaMap };
+
+          async function nextBatch() {
+            const batch = ids.slice(index, index + concurrency);
+            index += concurrency;
+            await Promise.all(batch.map(async (id) => {
+              try {
+                const tl = await api.get(`/requests/${id}/timeline`);
+                let role = '-';
+                let sla: 'On Time' | 'Delayed' = 'On Time';
+                if (tl?.items && Array.isArray(tl.items)) {
+                  // Find last ASSIGNED event or infer from description
+                  const assigned = [...tl.items].reverse().find((it: any) => (it.eventType || '').toUpperCase() === 'ASSIGNED');
+                  if (assigned?.description) {
+                    // Try to parse role mentioned in description
+                    const match = assigned.description.match(/role[:\s]+([A-Z_]+)/i);
+                    role = match?.[1] || role;
+                  }
+                  const breached = tl.items.find((it: any) => {
+                    const type = (it.eventType || '').toUpperCase();
+                    const desc = (it.description || '').toUpperCase();
+                    return type === 'SLA_BREACHED' || desc.includes('SLA') || desc.includes('BREACH') || desc.includes('DELAY');
+                  });
+                  if (breached) sla = 'Delayed';
                 }
-              }
-              roles[id] = role;
-            } catch {}
-          }));
-          if (index < ids.length) await nextBatch();
+                rolesFallback[id] = rolesFallback[id] || role;
+                slaMapFallback[id] = slaMapFallback[id] || sla;
+              } catch {}
+            }));
+            if (index < ids.length) await nextBatch();
+          }
+
+          await nextBatch();
+          setAssignedRoles((prev) => ({ ...prev, ...rolesFallback }));
+          setSlaStatusMap((prev) => ({ ...prev, ...slaMapFallback }));
         }
-        await nextBatch();
-        setAssignedRoles(roles);
       } catch (e: any) {
         setError(e?.message || 'Failed to load requests');
       } finally {
         setLoading(false);
       }
     })();
-  }, [page, size, sort, statusFilter, roleFilter]);
+  }, [page, size, sort, statusFilter, roleFilter, refreshKey]);
 
   const rows = useMemo(() => items.map((it) => {
     const created = new Date(it.createdAt);
     const now = new Date();
     const daysElapsed = Math.max(0, Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)));
     const assignedRole = assignedRoles[it.id] || '-';
-    return { ...it, daysElapsed, assignedRole };
-  }), [items, assignedRoles]);
+    const slaStatus = slaStatusMap[it.id] || 'On Time';
+    return { ...it, daysElapsed, assignedRole, slaStatus };
+  }), [items, assignedRoles, slaStatusMap]);
 
   return (
     <div className="glass-card p-6">
@@ -220,37 +296,27 @@ export default function MyRequestsTable() {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-subtext border-b border-border">
-                <th className="py-3 pr-4">Title</th>
-                <th className="py-3 pr-4">Status</th>
-                <th className="py-3 pr-4">Assigned Role</th>
+                <th className="py-3 pr-4">Request ID</th>
+                <th className="py-3 pr-4">Service Type</th>
+                <th className="py-3 pr-4">Current Status</th>
+                <th className="py-3 pr-4">Current Assigned Role</th>
                 <th className="py-3 pr-4">Days Elapsed</th>
+                <th className="py-3 pr-4">SLA Status</th>
                 <th className="py-3 pr-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-b border-border hover:bg-muted/40">
-                  <td className="py-3 pr-4 text-heading">{row.title}</td>
-                  <td className="py-3 pr-4"><StatusBadge status={row.status} /></td>
-                  <td className="py-3 pr-4 text-subtext">{row.assignedRole}</td>
-                  <td className="py-3 pr-4 text-heading">{row.daysElapsed}</td>
-                  <td className="py-3 pr-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="px-3 py-1.5 rounded-md bg-primary text-white text-xs hover:bg-primary/90"
-                        onClick={() => setTimelineFor(row.id)}
-                      >View Timeline</button>
-                      <button
-                        className="px-3 py-1.5 rounded-md border border-border text-xs hover:bg-muted"
-                        onClick={() => router.push(`/requests/${row.id}/timeline`)}
-                      >Open Full Page</button>
-                    </div>
-                  </td>
-                </tr>
+                <TableRow
+                  key={row.id}
+                  row={row}
+                  onViewTimeline={(id) => setTimelineFor(id)}
+                  onOpenFullPage={(id) => router.push(`/requests/${id}/timeline`)}
+                />
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-subtext">No requests found.</td>
+                  <td colSpan={7} className="py-6 text-center text-subtext">No requests found.</td>
                 </tr>
               )}
             </tbody>

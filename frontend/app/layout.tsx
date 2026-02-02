@@ -1,5 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { UserProvider } from '@/lib/userContext';
+import ClientShell from '@/components/layout/ClientShell';
 
 export const metadata: Metadata = {
   title: 'HDAS - Human Delay Accountability System',
@@ -13,7 +15,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <UserProvider>
+          <ClientShell>{children}</ClientShell>
+        </UserProvider>
+      </body>
     </html>
   )
 }

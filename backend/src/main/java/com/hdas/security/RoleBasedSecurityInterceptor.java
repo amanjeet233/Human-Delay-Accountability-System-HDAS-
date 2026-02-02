@@ -24,42 +24,58 @@ public class RoleBasedSecurityInterceptor implements HandlerInterceptor {
     
     @Override
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) throws Exception {
-        if (handler instanceof HandlerMethod) {
-            HandlerMethod handlerMethod = (HandlerMethod) handler;
-            
-            // Check role-based access
-            RequireRole requireRole = handlerMethod.getMethodAnnotation(RequireRole.class);
-            if (requireRole != null) {
-                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                if (!RoleBasedAccessControl.hasAnyRole(authentication, requireRole.value())) {
-                    log.warn("Access denied for user {} to method {}. Required roles: {}", 
-                            RoleBasedAccessControl.getCurrentUsername(),
-                            handlerMethod.getMethod().getName(),
-                            java.util.Arrays.toString(requireRole.value()));
-                    
-                    sendErrorResponse(response, "ACCESS_DENIED", "You don't have permission to access this resource", HttpServletResponse.SC_FORBIDDEN);
-                    return false;
-                }
+        if (!(handler instanceof HandlerMethod)) {
+            return true;
+        }
+
+        HandlerMethod handlerMethod = (HandlerMethod) handler;
+
+        // Check role-based access (Admin override)
+        RequireRole requireRole = handlerMethod.getMethodAnnotation(RequireRole.class);
+        if (requireRole != null) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                sendErrorResponse(response, "UNAUTHORIZED", "Authentication required", HttpServletResponse.SC_UNAUTHORIZED);
+                return false;
             }
-            
-            // Check permission-based access
-            RequirePermission requirePermission = handlerMethod.getMethodAnnotation(RequirePermission.class);
-            if (requirePermission != null) {
-                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            // Admin override: allow access if user has ADMIN role
+            if (!RoleBasedAccessControl.hasAnyRole(authentication, RoleBasedAccessControl.SystemRole.ADMIN)
+                    && !RoleBasedAccessControl.hasAnyRole(authentication, requireRole.value())) {
+                log.warn("Access denied for user {} to method {}. Required roles: {}",
+                        RoleBasedAccessControl.getCurrentUsername(),
+                        handlerMethod.getMethod().getName(),
+                        java.util.Arrays.toString(requireRole.value()));
+
+                sendErrorResponse(response, "ACCESS_DENIED", "You don't have permission to access this resource", HttpServletResponse.SC_FORBIDDEN);
+                return false;
+            }
+        }
+
+        // Check permission-based access (Admin override)
+        RequirePermission requirePermission = handlerMethod.getMethodAnnotation(RequirePermission.class);
+        if (requirePermission != null) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                sendErrorResponse(response, "UNAUTHORIZED", "Authentication required", HttpServletResponse.SC_UNAUTHORIZED);
+                return false;
+            }
+            // Admin override: admins bypass permission checks
+            boolean isAdmin = RoleBasedAccessControl.hasAnyRole(authentication, RoleBasedAccessControl.SystemRole.ADMIN);
+            if (!isAdmin) {
                 for (RoleBasedAccessControl.Permission permission : requirePermission.value()) {
                     if (!roleBasedAccessControl.hasPermission(authentication, permission)) {
-                        log.warn("Access denied for user {} to method {}. Required permission: {}", 
+                        log.warn("Access denied for user {} to method {}. Required permission: {}",
                                 RoleBasedAccessControl.getCurrentUsername(),
                                 handlerMethod.getMethod().getName(),
                                 permission.getPermissionName());
-                        
+
                         sendErrorResponse(response, "ACCESS_DENIED", "You don't have permission to perform this action", HttpServletResponse.SC_FORBIDDEN);
                         return false;
                     }
                 }
             }
         }
-        
+
         return true;
     }
     

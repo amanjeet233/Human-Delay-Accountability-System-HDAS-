@@ -7,16 +7,16 @@ interface DonutChartProps {
 }
 
 export default function DonutChart({ data }: DonutChartProps) {
-  const defaultData = [
-    { name: 'Housing', value: 35 },
-    { name: 'Food', value: 25 },
-    { name: 'Transport', value: 20 },
-    { name: 'Entertainment', value: 12 },
-    { name: 'Other', value: 8 },
-  ];
-
-  const chartData = data || defaultData;
+  const chartData = data && data.length > 0 ? data : [];
   const COLORS = ['#00897B', '#80CBC4', '#004D40', '#26A69A', '#B2DFDB'];
+
+  if (chartData.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-subtext text-sm">
+        No distribution data available
+      </div>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height="100%">

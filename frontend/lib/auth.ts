@@ -38,7 +38,8 @@ export const setUser = (user: User): void => {
 };
 
 export const isAuthenticated = (): boolean => {
-  return !!getToken();
+  // Consider session-auth users authenticated if user info exists
+  return !!getToken() || !!getUser();
 };
 
 export const hasRole = (role: string): boolean => {

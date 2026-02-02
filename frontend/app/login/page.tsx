@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, User, Lock, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
-import { setToken, setUser } from '@/lib/auth';
+import { getDashboardPath } from '@/lib/roleAccess';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,27 +13,43 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const response = await api.login(username, password);
-      
-      if (response.token) {
-        setToken(response.token);
-        setUser({
-          id: response.id,
-          username: response.username,
-          email: response.email,
-          role: response.role,
-        });
-        router.push('/dashboard');
+      // Perform login (sets session cookie)
+      const u = username.trim();
+      const p = password; // do not trim password; respect exact input
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[login] submitting', { username: u });
+      }
+      const auth = await api.login(u, p);
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[login] /auth/login response', auth);
+      }
+      // Prefer role from login response to route immediately
+      if (auth?.role) {
+        const target = getDashboardPath(auth.role);
+        router.replace(target);
+        return;
+      }
+      // Fallback: fetch current user from backend to get role
+      const me = await api.getMe();
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[login] /auth/me response', me);
+      }
+      if (!me?.role) {
+        setError('Unable to retrieve user session');
       } else {
-        setError('Invalid response from server');
+        const target = getDashboardPath(me.role);
+        router.replace(target);
       }
     } catch (err: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[login] error', err?.response?.status, err?.response?.data);
+      }
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);

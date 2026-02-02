@@ -11,18 +11,29 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
     });
 
     this.setupInterceptors();
   }
 
   private setupInterceptors() {
-    // Request interceptor - add JWT token
+    // Request interceptor - add JWT token when using JWT mode
     this.client.interceptors.request.use(
       (config) => {
+        if (process.env.NODE_ENV !== 'production') {
+          try {
+            // Debug: log outgoing API requests
+            console.debug('[api] request', {
+              method: config.method,
+              url: config.baseURL ? `${config.baseURL}${config.url}` : config.url,
+            });
+          } catch {}
+        }
         if (typeof window !== 'undefined') {
           const token = localStorage.getItem('token');
-          if (token) {
+          // Skip Authorization header for session-based auth placeholder
+          if (token && token !== 'session') {
             config.headers.Authorization = `Bearer ${token}`;
           }
         }
@@ -35,12 +46,25 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
+        if (process.env.NODE_ENV !== 'production') {
+          try {
+            // Debug: log API error responses
+            console.debug('[api] error', {
+              status: error.response?.status,
+              url: error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url,
+              data: error.response?.data,
+            });
+          } catch {}
+        }
         if (error.response?.status === 401) {
           // Unauthorized - clear token and redirect
           if (typeof window !== 'undefined') {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            // Avoid redirect loop when already on /login (e.g., UserProvider's getMe on login page)
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
           }
         }
         return Promise.reject(error);
@@ -89,26 +113,9 @@ class ApiClient {
     return response.data;
   }
 
-  // Roles
-  async getRoles() {
-    const response = await this.client.get('/admin/roles');
-    return response.data;
-  }
-
-  // Feature flags
-  async getFeatureFlags() {
-    const response = await this.client.get('/admin/feature-flags');
-    return response.data;
-  }
-
-  async toggleFeatureFlag(id: string, enabled: boolean) {
-    const response = await this.client.put(`/admin/feature-flags/${id}`, { enabled });
-    return response.data;
-  }
-
-  // Dashboard stats
-  async getDashboardStats() {
-    const response = await this.client.get('/dashboard/stats');
+  // Feature flags (governance: toggle only)
+  async toggleFeatureFlag(flag: string, enabled: boolean) {
+    const response = await this.client.post('/admin/feature-flags/toggle', { flag, enabled });
     return response.data;
   }
 

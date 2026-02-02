@@ -32,6 +32,7 @@ public class RequestController {
     private final FeatureFlagService featureFlagService;
     private final UserRepository userRepository;
     private final DelayRepository delayRepository;
+    private final com.hdas.service.DelayCalculationService delayCalculationService;
     private static final Logger log = Logger.getLogger(RequestController.class.getName());
     
     @PostMapping
@@ -342,8 +343,13 @@ public class RequestController {
         return ResponseEntity.ok(requestService.startAssignment(Objects.requireNonNull(assignmentId), httpRequest));
     }
 
-    @GetMapping("/assignments/my")
+    @GetMapping({"/assignments/my", "/tasks/my"})
     @RequirePermission(RoleBasedAccessControl.Permission.VIEW_ASSIGNED_REQUESTS)
+    @com.hdas.security.RequireRole({
+            RoleBasedAccessControl.SystemRole.CLERK,
+            RoleBasedAccessControl.SystemRole.SECTION_OFFICER,
+            RoleBasedAccessControl.SystemRole.HOD
+    })
     public ResponseEntity<Map<String, Object>> getMyAssignments(
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "page", required = false, defaultValue = "0") int page,
@@ -363,6 +369,16 @@ public class RequestController {
             m.put("assignedAt", a.getAssignedAt() != null ? a.getAssignedAt().toString() : null);
             m.put("startedAt", a.getStartedAt() != null ? a.getStartedAt().toString() : null);
             m.put("allowedDurationSeconds", a.getAllowedDurationSeconds());
+            // SLA deadline timestamp: from startedAt (if present) else assignedAt
+            java.time.Instant base = a.getStartedAt() != null ? a.getStartedAt() : a.getAssignedAt();
+            java.time.Instant deadline = null;
+            if (base != null && a.getAllowedDurationSeconds() != null) {
+                deadline = base.plusSeconds(a.getAllowedDurationSeconds());
+            }
+            m.put("slaDeadline", deadline != null ? deadline.toString() : null);
+            // Current delay in seconds (if any)
+            long currentDelay = delayCalculationService.calculateCurrentOverdueSeconds(a, java.time.Instant.now());
+            m.put("currentDelaySeconds", currentDelay);
             return m;
         }).toList();
         Map<String, Object> response = new java.util.HashMap<>();
@@ -390,7 +406,6 @@ public class RequestController {
     }
 
         @GetMapping("/{id}/timeline")
-        @RequirePermission(RoleBasedAccessControl.Permission.VIEW_ALL_DATA)
     @com.hdas.security.RequireRole({
             RoleBasedAccessControl.SystemRole.CITIZEN,
             RoleBasedAccessControl.SystemRole.ADMIN,

@@ -62,7 +62,6 @@ export default function TimelineModal({ requestId, open, onClose }: Props) {
             <RequestTimeline
               data={{
                 items: (data as any).items || [],
-                delays: (data as any).delays || [],
               }}
             />
           </div>

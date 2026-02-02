@@ -4,7 +4,7 @@
 -- Safe re-run supported via information_schema checks and guarded inserts.
 
 -- Create database and select it
-CREATE DATABASE IF NOT EXISTS hdas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE  EXISTS hdas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE hdas;
 
 -- ====================================================
@@ -180,6 +180,29 @@ CREATE TABLE IF NOT EXISTS assignments (
   INDEX idx_assignment_assigned (assigned_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Request Status History (tracks status transitions)
+CREATE TABLE IF NOT EXISTS request_status_history (
+  id BINARY(16) PRIMARY KEY,
+  request_id BINARY(16) NOT NULL,
+  previous_status VARCHAR(50) NOT NULL,
+  new_status VARCHAR(50) NOT NULL,
+  assigned_role VARCHAR(20) NOT NULL,
+  assigned_user_id BINARY(16) NOT NULL,
+  remarks TEXT,
+  changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  days_spent_days INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  version_num BIGINT NOT NULL DEFAULT 0,
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE RESTRICT,
+  FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+  INDEX idx_rsh_request (request_id),
+  INDEX idx_rsh_changed_at (changed_at),
+  INDEX idx_rsh_new_status (new_status),
+  INDEX idx_rsh_assigned_role (assigned_role),
+  INDEX idx_rsh_assigned_user (assigned_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Delays
 CREATE TABLE IF NOT EXISTS delays (
   id BINARY(16) PRIMARY KEY,
@@ -324,6 +347,32 @@ SET @sql := IF(@exists = 0, 'ALTER TABLE users ADD COLUMN version_num BIGINT NUL
 
 SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'updated_at');
 SET @sql := IF(@exists = 0, 'ALTER TABLE users ADD COLUMN updated_at TIMESTAMP NULL', NULL); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Ensure must_change_password column exists
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'must_change_password'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT TRUE',
+  NULL
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Ensure status column exists
+SET @exists := (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'users'
+    AND column_name = 'status'
+);
+SET @sql := IF(@exists = 0,
+  'ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT "ACTIVE"',
+  NULL
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Full Name generated column for convenience (idempotent)
 SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'full_name');

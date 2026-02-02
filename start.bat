@@ -35,7 +35,7 @@ if "%SKIP_BACKEND%"=="0" (
 
 REM Start Backend with dev profile in a new window on chosen port
 if "%SKIP_BACKEND%"=="0" (
-	start "HDAS Backend (dev) - Port %BACK_PORT%" cmd /k "cd /d backend && set SPRING_PROFILES_ACTIVE=dev && set SERVER_PORT=%BACK_PORT% && mvn spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--server.port=%BACK_PORT%"
+	start "HDAS Backend (dev) - Port %BACK_PORT%" cmd /k "cd /d backend && set SPRING_PROFILES_ACTIVE=dev && mvn clean && mvn spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--server.port=%BACK_PORT%"
 ) else (
 	echo [INFO] Backend already running on port %BACK_PORT%.
 )

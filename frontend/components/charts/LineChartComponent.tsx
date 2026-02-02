@@ -7,16 +7,15 @@ interface LineChartComponentProps {
 }
 
 export default function LineChartComponent({ data }: LineChartComponentProps) {
-  const defaultData = [
-    { month: 'Jan', value: 12 },
-    { month: 'Feb', value: 19 },
-    { month: 'Mar', value: 15 },
-    { month: 'Apr', value: 22 },
-    { month: 'May', value: 28 },
-    { month: 'Jun', value: 35 },
-  ];
+  const chartData = data && data.length > 0 ? data : [];
 
-  const chartData = data || defaultData;
+  if (chartData.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-subtext text-sm">
+        No metrics available
+      </div>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height="100%">

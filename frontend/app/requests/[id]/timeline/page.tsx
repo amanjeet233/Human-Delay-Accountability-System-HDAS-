@@ -60,7 +60,6 @@ export default function TimelinePage({ params }: { params: { id: string } }) {
             <RequestTimeline
               data={{
                 items: (data as any).items || [],
-                delays: (data as any).delays || [],
               }}
             />
           </div>
