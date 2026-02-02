@@ -13,6 +13,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Developer convenience: quick login with default admin in non-production
+  const quickDevLogin = async () => {
+    if (process.env.NODE_ENV === 'production') return;
+    setError('');
+    setLoading(true);
+    try {
+      const auth = await api.login('admin', 'admin123');
+      const role = auth?.role || 'ADMIN';
+      const target = getDashboardPath(role);
+      router.replace(target);
+    } catch (err: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[login] quickDevLogin error', err?.response?.status, err?.response?.data);
+      }
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
@@ -126,6 +146,20 @@ export default function LoginPage() {
           <div className="mt-6 text-center text-sm text-subtext">
             <p>Secure access to accountability platform</p>
           </div>
+
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={quickDevLogin}
+                className="btn-primary w-full"
+                disabled={loading}
+              >
+                Use default admin (dev)
+              </button>
+              <p className="mt-2 text-xs text-subtext">Username: admin · Password: admin123</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
