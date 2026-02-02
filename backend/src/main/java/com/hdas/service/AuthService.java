@@ -22,13 +22,20 @@ public class AuthService {
     
     @Transactional(readOnly = true)
     public AuthResponse buildAuthResponse(String username) {
+        log.debug("Building auth response for user: {}", username);
+        
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> {
+                log.error("Failed to build auth response - User not found: {}", username);
+                return new RuntimeException("User not found");
+            });
 
         // Extract user's roles and determine primary role with precedence
         Set<String> userRoles = user.getRoles().stream()
             .map(role -> role.getName())
             .collect(Collectors.toSet());
+        
+        log.debug("User {} has roles: {}", username, userRoles);
 
         // Normalize primary role selection: prefer ADMIN if present, else pick a sensible highest privilege
         String primaryRole =
@@ -38,6 +45,8 @@ public class AuthService {
             userRoles.contains("AUDITOR") ? "AUDITOR" :
             userRoles.contains("CLERK") ? "CLERK" :
             userRoles.stream().findFirst().orElse("CITIZEN");
+        
+        log.debug("Selected primary role for user {}: {}", username, primaryRole);
 
         return AuthResponse.builder()
             .username(user.getUsername())
