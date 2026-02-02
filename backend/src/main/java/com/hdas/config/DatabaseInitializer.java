@@ -58,7 +58,9 @@ public class DatabaseInitializer implements CommandLineRunner {
     
     private void initializeAdminUser() {
         // Create or update admin user with proper configuration
-        // Password: admin123 (BCrypt hashed with strength 12)
+        // Default password is "admin123" for initial setup. 
+        // Set HDAS_ADMIN_PASSWORD environment variable to override.
+        // IMPORTANT: Change the admin password immediately after first login in production!
         String adminPassword = environment.getProperty("HDAS_ADMIN_PASSWORD", "admin123");
         
         Role adminRole = roleRepository.findByName("ADMIN")
