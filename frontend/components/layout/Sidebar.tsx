@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { removeToken } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { isPathAllowed } from '@/lib/roleAccess';
 import { useUser } from '@/lib/userContext';
 
@@ -29,11 +30,20 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useUser();
+  const { user, setUser } = useUser();
 
-  const handleLogout = () => {
-    removeToken();
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      // Invalidate server session (clears JSESSIONID)
+      await api.logout();
+    } catch {
+      // Ignore errors and proceed to client cleanup
+    } finally {
+      // Clear client-side auth state and redirect
+      removeToken();
+      setUser(null);
+      router.replace('/login');
+    }
   };
 
   const filteredMenu = menuItems.filter(item => {

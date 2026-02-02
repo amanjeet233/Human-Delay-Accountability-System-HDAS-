@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'HOD' | 'SECTION_OFFICER' | 'CLERK' | 'CITIZEN';
+export type Role = 'ADMIN' | 'HOD' | 'SECTION_OFFICER' | 'CLERK' | 'CITIZEN' | 'AUDITOR';
 
 // Redirect all roles to the unified dashboard route to avoid 404s
 // Role-specific views are handled inside /dashboard based on backend role
@@ -8,14 +8,16 @@ export const roleDashboard: Record<Role, string> = {
   SECTION_OFFICER: '/dashboard',
   CLERK: '/dashboard',
   CITIZEN: '/dashboard',
+  AUDITOR: '/dashboard',
 };
 
 export const roleAllowedPrefixes: Record<Role, string[]> = {
-  ADMIN: ['/', '/admin', '/hod', '/section-officer', '/clerk', '/citizen'],
-  HOD: ['/hod'],
-  SECTION_OFFICER: ['/section-officer'],
-  CLERK: ['/clerk'],
-  CITIZEN: ['/citizen'],
+  ADMIN: ['/', '/dashboard', '/admin', '/hod', '/section-officer', '/clerk', '/citizen', '/users', '/roles', '/feature-flags', '/reports', '/profile', '/settings'],
+  HOD: ['/dashboard', '/hod', '/profile'],
+  SECTION_OFFICER: ['/dashboard', '/section-officer', '/profile'],
+  CLERK: ['/dashboard', '/clerk', '/profile'],
+  CITIZEN: ['/dashboard', '/citizen', '/profile'],
+  AUDITOR: ['/dashboard', '/reports', '/profile'],
 };
 
 export function getDashboardPath(role: string | undefined | null): string {
